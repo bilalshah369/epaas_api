@@ -74,6 +74,9 @@ model Application {
   // Product name extracted from formData for easy display
   productName     String?   @map("product_name")
 
+  // EC Assessment checklist + notes saved by Expert Committee
+  ecAssessment    Json?     @map("ec_assessment")
+
   submittedAt     DateTime? @map("submitted_at")
   rejectedAt      DateTime? @map("rejected_at")
   createdAt       DateTime  @default(now()) @map("created_at")

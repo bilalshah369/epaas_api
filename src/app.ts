@@ -8,19 +8,15 @@ import applicationRouter from './routes/application.routes';
 import uploadRouter      from './routes/upload.routes';
 import nodalARouter      from './routes/nodalA.routes';
 import technicalRouter   from './routes/technical.routes';
+import ecRouter          from './routes/ec.routes';
+import nodalBRouter      from './routes/nodal-b.routes';
+import ceoRouter         from './routes/ceo.routes';
+import chairpersonRouter from './routes/chairperson.routes';
 import appealRouter      from './routes/appeal.routes';
 import extensionRouter   from './routes/extension.routes';
 import publicRouter      from './routes/public.routes';
+import adminRouter       from './routes/admin.routes';
 import { errorHandler } from './middleware/errorHandler.middleware';
-// Future routes uncommented as each step is built:
-// import workflowRouter     from './routes/workflow.routes';
-// import decisionRouter     from './routes/decision.routes';
-// import appealRouter       from './routes/appeal.routes';
-// import reviewRouter       from './routes/review.routes';
-// import extensionRouter    from './routes/extension.routes';
-// import reportsRouter      from './routes/reports.routes';
-// import notificationRouter from './routes/notification.routes';
-// import adminRouter        from './routes/admin.routes';
 
 const app = express();
 
@@ -62,15 +58,13 @@ app.use('/api/applications', applicationRouter);
 app.use('/api/uploads',      uploadRouter);
 app.use('/api/nodal-a',      nodalARouter);
 app.use('/api/technical',   technicalRouter);
+app.use('/api/ec',          ecRouter);
+app.use('/api/nodal-b',     nodalBRouter);
+app.use('/api/ceo',         ceoRouter);
+app.use('/api/chairperson', chairpersonRouter);
 app.use('/api/appeals',     appealRouter);
 app.use('/api/extensions',  extensionRouter);
-// app.use('/api/workflow',     workflowRouter);
-// app.use('/api/appeals',      appealRouter);
-// app.use('/api/reviews',      reviewRouter);
-// app.use('/api/extensions',   extensionRouter);
-// app.use('/api/reports',      reportsRouter);
-// app.use('/api/notifications',notificationRouter);
-// app.use('/api/admin',        adminRouter);
+app.use('/api/admin',       adminRouter);
 
 // ── 404 ────────────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {
