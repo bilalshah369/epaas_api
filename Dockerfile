@@ -14,11 +14,11 @@ COPY src ./src
 COPY tsconfig.json ./
 COPY prisma ./prisma
 
+# Generate Prisma client (must run before tsc so generated types are available)
+RUN npm run db:generate
+
 # Build the application
 RUN npm run build
-
-# Generate Prisma client
-RUN npm run db:generate
 
 # Runtime stage
 FROM node:20-alpine
