@@ -38,6 +38,8 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY prisma ./prisma
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 # Expose port (change if needed)
 EXPOSE 5000
@@ -46,8 +48,7 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:5000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Use dumb-init to run node
-ENTRYPOINT ["/usr/sbin/dumb-init", "--"]
+# Use dumb-init to run entrypoint (migrate + seed + start)
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/app/entrypoint.sh"]
 
-# Start the application
 CMD ["node", "dist/server.js"]
