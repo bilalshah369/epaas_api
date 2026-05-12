@@ -20,6 +20,6 @@ push2azure:
   stage: build
   tags: [epass-azure]
   script:
-    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA nta.registry:3389/$SERVICE:$CI_COMMIT_TAG
-    - docker image push nta.registry:3389/$SERVICE:$CI_COMMIT_TAG
+    - docker tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA training.registry:3389/$SERVICE:$CI_COMMIT_TAG
+    - docker image push training.registry:3389/$SERVICE:$CI_COMMIT_TAG
     - docker rmi $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
