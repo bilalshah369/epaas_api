@@ -4,10 +4,8 @@ set -e
 echo "Running database migrations..."
 npx prisma migrate deploy
 
-if [ "$RUN_SEED" = "true" ]; then
-  echo "Running database seed..."
-  node dist/seed.js
-fi
+echo "Running database seed..."
+npm run db:seed || true
 
 echo "Starting server..."
 exec "$@"
