@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
@@ -110,7 +111,13 @@ export async function recordDecision(req: Request, res: Response, next: NextFunc
     if (app.stage !== 'WithTechnicalOfficer') {
       throw new AppError(`Cannot record decision: application is in "${app.stage}"`, 400);
     }
-    const toDecision = { decision, conditions: conditions ?? '', reasons: reasons ?? '', form2Data: form2Data ?? {}, recordedAt: new Date().toISOString() };
+    const toDecision: Prisma.InputJsonObject = {
+      decision,
+      conditions: conditions ?? '',
+      reasons: reasons ?? '',
+      form2Data: (form2Data ?? {}) as Prisma.InputJsonObject,
+      recordedAt: new Date().toISOString(),
+    };
     const application = await prisma.application.update({
       where: { id },
       data: { toDecision, stage: 'WithNodalOfficerA' },
