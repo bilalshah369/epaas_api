@@ -10,8 +10,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "db:seed": "node dist/seed.js",
-    "db:reset": "node dist/seed.js"
+    "db:seed": "tsx src/seed.ts",
+    "db:reset": "tsx src/reset.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
