@@ -64,12 +64,15 @@ export function uploadFile(req: Request, res: Response, next: NextFunction) {
 
 // GET /api/uploads/:storedName  — serve file (no auth for now; add in prod)
 export function serveFile(req: Request, res: Response, next: NextFunction) {
-  const storedName = req.params['storedName'] as string;
+  const storedName = req.params.storedName;
   // Basic path traversal guard
-  if (storedName.includes('/') || storedName.includes('..')) {
+  if (storedName.includes('/') || storedName.includes('\\') || storedName.includes('..')) {
     return next(new AppError('Invalid file name', 400));
   }
   const filePath = path.join(UPLOAD_DIR, storedName);
   if (!fs.existsSync(filePath)) return next(new AppError('File not found', 404));
-  res.sendFile(filePath);
+  // Use { root } form — avoids Windows absolute-path quirks in Express sendFile
+  res.sendFile(storedName, { root: UPLOAD_DIR }, (err) => {
+    if (err) next(new AppError('File not found', 404));
+  });
 }

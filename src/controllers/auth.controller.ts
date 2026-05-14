@@ -74,3 +74,15 @@ export async function me(req: Request, res: Response, next: NextFunction) {
     next(err);
   }
 }
+
+export async function updateProfile(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) return next(new AppError('Unauthenticated', 401));
+    const { orgName } = z.object({ orgName: z.string().min(2, 'Business name must be at least 2 characters') }).parse(req.body);
+    const user = await authService.updateOrgName(req.user.userId, orgName);
+    res.json({ user });
+  } catch (err) {
+    if (err instanceof z.ZodError) return next(new AppError(err.errors[0].message, 422));
+    next(err);
+  }
+}

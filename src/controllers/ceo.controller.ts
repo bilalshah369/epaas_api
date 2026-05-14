@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
+import { getApplicationsByStage, getAllApplications } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 
@@ -47,40 +47,7 @@ export async function listExtensions(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
-// POST /api/ceo/applications/:id/forward-chairperson  →  WithCEO → WithChairperson
-export async function forwardToChairperson(req: Request, res: Response, next: NextFunction) {
-  try {
-    const id = req.params['id'] as string;
-    const app = await prisma.application.findUnique({ where: { id } });
-    if (!app) throw new AppError('Application not found', 404);
-    if (app.stage !== 'WithCEO') {
-      throw new AppError(`Cannot forward: application is in "${app.stage}"`, 400);
-    }
-    const application = await advanceStage(id, 'WithCEO', 'WithChairperson');
-    res.json({ application });
-  } catch (e) { next(e); }
-}
-
-// POST /api/ceo/applications/:id/reject  →  Rejected
-export async function rejectApplication(req: Request, res: Response, next: NextFunction) {
-  try {
-    const id = req.params['id'] as string;
-    const { reason } = req.body as { reason?: string };
-    if (!reason?.trim()) throw new AppError('Rejection reason is required', 400);
-    const app = await prisma.application.findUnique({ where: { id } });
-    if (!app) throw new AppError('Application not found', 404);
-    if (app.stage !== 'WithCEO') {
-      throw new AppError(`Cannot reject: application is in "${app.stage}"`, 400);
-    }
-    const application = await prisma.application.update({
-      where: { id },
-      data: { stage: 'Rejected' },
-    });
-    res.json({ application });
-  } catch (e) { next(e); }
-}
-
-// POST /api/ceo/appeals/:id/approve  →  AppealApproved
+// POST /api/ceo/appeals/:id/approve  →  AppealApproved + application → WithNodalOfficerA
 export async function approveAppeal(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
@@ -91,15 +58,15 @@ export async function approveAppeal(req: Request, res: Response, next: NextFunct
     if (appeal.status !== 'AppealPending') {
       throw new AppError(`Cannot approve: appeal status is "${appeal.status}"`, 400);
     }
-    const updated = await prisma.appeal.update({
-      where: { id },
-      data: { status: 'AppealApproved', decisionRemarks, decisionAt: new Date() },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.appeal.update({ where: { id }, data: { status: 'AppealApproved', decisionRemarks, decisionAt: new Date() } }),
+      prisma.application.update({ where: { id: appeal.applicationId }, data: { stage: 'WithNodalOfficerA' } }),
+    ]);
     res.json({ appeal: updated });
   } catch (e) { next(e); }
 }
 
-// POST /api/ceo/appeals/:id/reject  →  AppealRejected
+// POST /api/ceo/appeals/:id/reject  →  AppealRejected + application → WithNodalOfficerA
 export async function rejectAppeal(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
@@ -110,10 +77,10 @@ export async function rejectAppeal(req: Request, res: Response, next: NextFuncti
     if (appeal.status !== 'AppealPending') {
       throw new AppError(`Cannot reject: appeal status is "${appeal.status}"`, 400);
     }
-    const updated = await prisma.appeal.update({
-      where: { id },
-      data: { status: 'AppealRejected', decisionRemarks, decisionAt: new Date() },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.appeal.update({ where: { id }, data: { status: 'AppealRejected', decisionRemarks, decisionAt: new Date() } }),
+      prisma.application.update({ where: { id: appeal.applicationId }, data: { stage: 'WithNodalOfficerA' } }),
+    ]);
     res.json({ appeal: updated });
   } catch (e) { next(e); }
 }

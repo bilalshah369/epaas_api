@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { loginApplicant, loginAuthority, register, me } from '../controllers/auth.controller';
+import { loginApplicant, loginAuthority, register, me, updateProfile } from '../controllers/auth.controller';
 import { verifyToken } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -21,7 +21,10 @@ router.post('/login/authority', loginLimiter, loginAuthority);
 // POST /api/auth/register
 router.post('/register', register);
 
-// GET /api/auth/me  — verify token + return current user
+// GET  /api/auth/me  — verify token + return current user
 router.get('/me', verifyToken, me);
+
+// PATCH /api/auth/me — update business name
+router.patch('/me', verifyToken, updateProfile);
 
 export default router;

@@ -75,6 +75,50 @@ export async function forwardToEC(req: Request, res: Response, next: NextFunctio
   } catch (e) { next(e); }
 }
 
+// POST /api/technical/applications/:id/request-clarification  →  WithTechnicalOfficer → QuerySent
+export async function requestClarification(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const { text } = req.body as { text?: string };
+    if (!text?.trim()) throw new AppError('Clarification text is required', 400);
+    const app = await prisma.application.findUnique({ where: { id } });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.stage !== 'WithTechnicalOfficer') {
+      throw new AppError(`Cannot request clarification: application is in "${app.stage}"`, 400);
+    }
+    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    await prisma.$transaction([
+      prisma.query.create({
+        data: { applicationId: id, text, askedById: userId ?? '', originStage: 'WithTechnicalOfficer', revertedFromStage: 'WithTechnicalOfficer' },
+      }),
+      prisma.application.update({ where: { id }, data: { stage: 'QuerySent' } }),
+    ]);
+    res.json({ message: 'Clarification requested. Application stage set to QuerySent.' });
+  } catch (e) { next(e); }
+}
+
+// POST /api/technical/applications/:id/record-decision  →  save Form 2 data + WithNodalOfficerA
+export async function recordDecision(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const { decision, conditions, reasons, form2Data } = req.body as {
+      decision?: string; conditions?: string; reasons?: string; form2Data?: Record<string, unknown>;
+    };
+    if (!decision) throw new AppError('Decision (Approved/Rejected) is required', 400);
+    const app = await prisma.application.findUnique({ where: { id } });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.stage !== 'WithTechnicalOfficer') {
+      throw new AppError(`Cannot record decision: application is in "${app.stage}"`, 400);
+    }
+    const toDecision = { decision, conditions: conditions ?? '', reasons: reasons ?? '', form2Data: form2Data ?? {}, recordedAt: new Date().toISOString() };
+    const application = await prisma.application.update({
+      where: { id },
+      data: { toDecision, stage: 'WithNodalOfficerA' },
+    });
+    res.json({ application });
+  } catch (e) { next(e); }
+}
+
 // POST /api/technical/applications/:id/reject  →  Rejected
 export async function rejectApplication(req: Request, res: Response, next: NextFunction) {
   try {

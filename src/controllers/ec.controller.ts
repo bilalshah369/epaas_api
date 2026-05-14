@@ -67,15 +67,22 @@ export async function listReviewsReport(req: Request, res: Response, next: NextF
   } catch (e) { next(e); }
 }
 
-// POST /api/ec/applications/:id/forward-nodalb  →  WithExpertCommittee → WithNodalPointB
-export async function forwardToNodalB(req: Request, res: Response, next: NextFunction) {
+// POST /api/ec/applications/:id/forward-technical  →  WithExpertCommittee → WithTechnicalOfficer
+export async function forwardToTechnicalOfficer(req: Request, res: Response, next: NextFunction) {
   try {
-    const application = await advanceStage(req.params['id'] as string, 'WithExpertCommittee', 'WithNodalPointB');
+    const id = req.params['id'] as string;
+    const app = await prisma.application.findUnique({ where: { id } });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.stage !== 'WithExpertCommittee') throw new AppError(`Cannot forward: application is in "${app.stage}"`, 400);
+    const application = await prisma.application.update({
+      where: { id },
+      data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendApproval', forwardedAt: new Date().toISOString() } },
+    });
     res.json({ application });
   } catch (e) { next(e); }
 }
 
-// POST /api/ec/applications/:id/reject  →  Rejected
+// POST /api/ec/applications/:id/reject  →  WithExpertCommittee → WithTechnicalOfficer (EC recommends rejection)
 export async function rejectApplication(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
@@ -84,11 +91,11 @@ export async function rejectApplication(req: Request, res: Response, next: NextF
     const app = await prisma.application.findUnique({ where: { id } });
     if (!app) throw new AppError('Application not found', 404);
     if (app.stage !== 'WithExpertCommittee') {
-      throw new AppError(`Cannot reject: application is in "${app.stage}"`, 400);
+      throw new AppError(`Cannot record rejection: application is in "${app.stage}"`, 400);
     }
     const application = await prisma.application.update({
       where: { id },
-      data: { stage: 'Rejected' },
+      data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendRejection', ecRemarks: reason, forwardedAt: new Date().toISOString() } },
     });
     res.json({ application });
   } catch (e) { next(e); }

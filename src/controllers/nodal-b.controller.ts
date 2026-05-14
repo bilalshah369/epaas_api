@@ -43,16 +43,16 @@ export async function listExtensions(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
-// POST /api/nodal-b/applications/:id/forward-ceo  →  WithNodalPointB → WithCEO
-export async function forwardToCEO(req: Request, res: Response, next: NextFunction) {
+// POST /api/nodal-b/applications/:id/upload-ec-decision  →  WithNodalPointB → WithTechnicalOfficer
+export async function uploadECDecision(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
     const app = await prisma.application.findUnique({ where: { id } });
     if (!app) throw new AppError('Application not found', 404);
     if (app.stage !== 'WithNodalPointB') {
-      throw new AppError(`Cannot forward: application is in "${app.stage}"`, 400);
+      throw new AppError(`Cannot upload EC decision: application is in "${app.stage}"`, 400);
     }
-    const application = await advanceStage(id, 'WithNodalPointB', 'WithCEO');
+    const application = await advanceStage(id, 'WithNodalPointB', 'WithTechnicalOfficer');
     res.json({ application });
   } catch (e) { next(e); }
 }

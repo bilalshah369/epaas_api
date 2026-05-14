@@ -4,7 +4,7 @@ import { checkRole } from '../middleware/role.middleware';
 import {
   listPending, listAll, listAppealReview, listExtensionRequests,
   listAppealsReport, listReviewsReport,
-  forwardToNodalB, rejectApplication, requestClarification, saveAssessment,
+  forwardToTechnicalOfficer, rejectApplication, requestClarification, saveAssessment,
 } from '../controllers/ec.controller';
 
 const router = Router();
@@ -16,7 +16,7 @@ router.get ('/appeal-review',                   ...ecMember, listAppealReview);
 router.get ('/extension-requests',              ...ecMember, listExtensionRequests);
 router.get ('/reports/appeals',                 ...ecMember, listAppealsReport);
 router.get ('/reports/reviews',                 ...ecMember, listReviewsReport);
-router.post ('/applications/:id/forward-nodalb', ...ecMember, forwardToNodalB);
+router.post ('/applications/:id/forward-technical', ...ecMember, forwardToTechnicalOfficer);
 router.post ('/applications/:id/reject',         ...ecMember, rejectApplication);
 router.post ('/applications/:id/clarify',        ...ecMember, requestClarification);
 router.patch('/applications/:id/assessment',     ...ecMember, saveAssessment);

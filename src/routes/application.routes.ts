@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { verifyToken } from '../middleware/auth.middleware';
 import { checkRole }   from '../middleware/role.middleware';
-import { myApplications, getOne, create, save, submit } from '../controllers/application.controller';
+import { myApplications, getOne, create, save, submit, deleteDraftApp } from '../controllers/application.controller';
 import queryRouter from './query.routes';
 
 const router  = Router();
@@ -12,6 +12,7 @@ router.post('/',            ...applicant, create);
 router.get('/:id',          verifyToken,  getOne);   // officers can read too
 router.put('/:id',          ...applicant, save);
 router.post('/:id/submit',  ...applicant, submit);
+router.delete('/:id',       ...applicant, deleteDraftApp);
 
 // Nested query routes — /api/applications/:id/queries/...
 router.use('/:id/queries', queryRouter);

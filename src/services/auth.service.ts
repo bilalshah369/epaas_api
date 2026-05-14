@@ -25,14 +25,18 @@ function signToken(user: UserWithRole): string {
 
 function toPublicUser(user: UserWithRole) {
   return {
-    id:             user.id,
-    username:       user.username,
-    email:          user.email,
-    roleCode:       user.role.roleCode,
-    roleName:       user.role.roleName,
-    licenseNumber:  user.licenseNumber ?? undefined,
-    officeLocation: user.officeLocation ?? undefined,
-    isActive:       user.isActive,
+    id:              user.id,
+    username:        user.username,
+    email:           user.email,
+    roleCode:        user.role.roleCode,
+    roleName:        user.role.roleName,
+    licenseNumber:   user.licenseNumber  ?? undefined,
+    officeLocation:  user.officeLocation ?? undefined,
+    isActive:        user.isActive,
+    name:            user.name            ?? undefined,
+    mobile:          user.mobile          ?? undefined,
+    orgName:         user.orgName         ?? undefined,
+    natureOfBusiness:user.natureOfBusiness ?? undefined,
   };
 }
 
@@ -113,10 +117,14 @@ export async function registerApplicant(data: RegisterData) {
 
   const user = await prisma.user.create({
     data: {
-      roleId:        applicantRole.id,
+      roleId:           applicantRole.id,
       username,
-      email:         data.email,
+      email:            data.email,
       passwordHash,
+      name:             data.name,
+      mobile:           data.mobile,
+      orgName:          data.orgName,
+      natureOfBusiness: data.natureOfBusiness,
     },
     include: { role: true },
   });
@@ -132,5 +140,16 @@ export async function getUserById(id: string) {
     include: { role: true },
   });
   if (!user || !user.isActive) throw new AppError('User not found', 404);
+  return toPublicUser(user);
+}
+
+// ── Update profile (orgName only) ─────────────────────────────────────────
+
+export async function updateOrgName(id: string, orgName: string) {
+  const user = await prisma.user.update({
+    where: { id },
+    data:  { orgName: orgName.trim() },
+    include: { role: true },
+  });
   return toPublicUser(user);
 }

@@ -31,14 +31,19 @@ model User {
   id             String   @id @default(uuid())
   roleId         String   @map("role_id")
   role           Role     @relation(fields: [roleId], references: [id])
-  username       String   @unique
-  email          String   @unique
-  passwordHash   String   @map("password_hash")
+  username         String   @unique
+  email            String   @unique
+  passwordHash     String   @map("password_hash")
+  // Applicant signup fields — stored for profile display
+  name             String?  @map("name")
+  mobile           String?  @map("mobile")
+  orgName          String?  @map("org_name")
+  natureOfBusiness String?  @map("nature_of_business")
   // For Applicants: FSSAI license number used as login identifier
-  licenseNumber  String?  @unique @map("license_number")
+  licenseNumber    String?  @unique @map("license_number")
   // officeLocation is null for Applicants (TDD §4.1)
-  officeLocation String?  @map("office_location")
-  isActive       Boolean  @default(true) @map("is_active")
+  officeLocation   String?  @map("office_location")
+  isActive         Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -65,6 +70,7 @@ model Application {
   address         String    @default("")
   applicationType String    @map("application_type")  // NSF | ClaimApproval | AyurvedaAahara | RPET | AnyOther
   foodCategory    String    @default("") @map("food_category")
+  workflowType    String    @default("New") @map("workflow_type")  // New | Appeal | Review | WithdrawalByApplicant | WithdrawnByAuthorities
 
   // Workflow stage — mirrors STAGES constants (TDD §6)
   stage           String    @default("Draft")
@@ -76,6 +82,9 @@ model Application {
 
   // EC Assessment checklist + notes saved by Expert Committee
   ecAssessment    Json?     @map("ec_assessment")
+
+  // Form 2 decision data prepared by Technical Officer after EC review
+  toDecision      Json?     @map("to_decision")
 
   submittedAt     DateTime? @map("submitted_at")
   rejectedAt      DateTime? @map("rejected_at")

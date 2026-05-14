@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { UPLOAD_DIR } from './middleware/upload.middleware';
 
 import authRouter        from './routes/auth.routes';
 import applicationRouter from './routes/application.routes';
@@ -55,7 +56,11 @@ app.get('/health', (_req: Request, res: Response) => {
 app.use('/api/auth',         authRouter);
 app.use('/api/public',       publicRouter);
 app.use('/api/applications', applicationRouter);
+// Serve uploaded files via express.static (reliable on all platforms)
+app.use('/api/uploads', express.static(UPLOAD_DIR, { fallthrough: true }));
 app.use('/api/uploads',      uploadRouter);
+// Fallback: also serve UUID-named files at /api/:filename (handles URLs where /uploads/ is missing)
+app.use('/api', express.static(UPLOAD_DIR, { fallthrough: true }));
 app.use('/api/nodal-a',      nodalARouter);
 app.use('/api/technical',   technicalRouter);
 app.use('/api/ec',          ecRouter);

@@ -3,6 +3,9 @@ import { getApplicationsByStage, getAllApplications } from '../services/workflow
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 
+// NOTE: Chairperson role handles review petitions only.
+// Main application approve/reject removed — those were CEO/Chairperson chain (wrong flow).
+
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
 // GET /api/chairperson/applications  →  WithChairperson queue
@@ -48,45 +51,7 @@ export async function listExtensions(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
-// POST /api/chairperson/applications/:id/approve  →  Approved
-export async function approveApplication(req: Request, res: Response, next: NextFunction) {
-  try {
-    const id = req.params['id'] as string;
-    const { remarks } = req.body as { remarks?: string };
-    if (!remarks?.trim()) throw new AppError('Remarks are required', 400);
-    const app = await prisma.application.findUnique({ where: { id } });
-    if (!app) throw new AppError('Application not found', 404);
-    if (app.stage !== 'WithChairperson') {
-      throw new AppError(`Cannot approve: application is in "${app.stage}"`, 400);
-    }
-    const application = await prisma.application.update({
-      where: { id },
-      data: { stage: 'Approved' },
-    });
-    res.json({ application });
-  } catch (e) { next(e); }
-}
-
-// POST /api/chairperson/applications/:id/reject  →  Rejected
-export async function rejectApplication(req: Request, res: Response, next: NextFunction) {
-  try {
-    const id = req.params['id'] as string;
-    const { reason } = req.body as { reason?: string };
-    if (!reason?.trim()) throw new AppError('Rejection reason is required', 400);
-    const app = await prisma.application.findUnique({ where: { id } });
-    if (!app) throw new AppError('Application not found', 404);
-    if (app.stage !== 'WithChairperson') {
-      throw new AppError(`Cannot reject: application is in "${app.stage}"`, 400);
-    }
-    const application = await prisma.application.update({
-      where: { id },
-      data: { stage: 'Rejected' },
-    });
-    res.json({ application });
-  } catch (e) { next(e); }
-}
-
-// POST /api/chairperson/reviews/:id/dispose  →  ReviewDisposed
+// POST /api/chairperson/reviews/:id/dispose  →  ReviewDisposed + application → WithNodalOfficerA
 export async function disposeReview(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
@@ -97,10 +62,10 @@ export async function disposeReview(req: Request, res: Response, next: NextFunct
     if (review.status !== 'ReviewPending') {
       throw new AppError(`Cannot dispose: review status is "${review.status}"`, 400);
     }
-    const updated = await prisma.review.update({
-      where: { id },
-      data: { status: 'ReviewDisposed', decisionRemarks, decisionAt: new Date() },
-    });
+    const [updated] = await prisma.$transaction([
+      prisma.review.update({ where: { id }, data: { status: 'ReviewDisposed', decisionRemarks, decisionAt: new Date() } }),
+      prisma.application.update({ where: { id: review.applicationId }, data: { stage: 'WithNodalOfficerA' } }),
+    ]);
     res.json({ review: updated });
   } catch (e) { next(e); }
 }
