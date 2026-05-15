@@ -53,7 +53,7 @@ export async function listAppeals(applicantId: string) {
   return [...pendingFiling, ...filed];
 }
 
-export async function fileAppeal(applicantId: string, applicationId: string, grounds: string) {
+export async function fileAppeal(applicantId: string, applicationId: string, grounds: string, attachmentUrl?: string) {
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
   if (!app)                        throw new AppError('Application not found', 404);
   if (app.applicantId !== applicantId) throw new AppError('Forbidden', 403);
@@ -66,7 +66,7 @@ export async function fileAppeal(applicantId: string, applicationId: string, gro
   if (window === 0) throw new AppError('Appeal window has expired', 400);
 
   return prisma.appeal.create({
-    data: { applicationId, applicantId, grounds, status: 'AppealPending' },
+    data: { applicationId, applicantId, grounds, attachmentUrl: attachmentUrl ?? null, status: 'AppealPending' },
     include: { application: true },
   });
 }
@@ -118,7 +118,7 @@ export async function listReviews(applicantId: string) {
   return [...pendingReview, ...filed];
 }
 
-export async function fileReview(applicantId: string, appealId: string, grounds: string) {
+export async function fileReview(applicantId: string, appealId: string, grounds: string, attachmentUrl?: string) {
   const appeal = await prisma.appeal.findUnique({
     where:   { id: appealId },
     include: { application: true },
@@ -139,6 +139,7 @@ export async function fileReview(applicantId: string, appealId: string, grounds:
       appealId,
       applicantId,
       grounds,
+      attachmentUrl: attachmentUrl ?? null,
       status: 'ReviewPending',
     },
     include: { application: true, appeal: true },

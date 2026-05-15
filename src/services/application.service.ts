@@ -14,8 +14,13 @@ const TYPE_CODES: Record<string, string> = {
 // ── Reference number helpers ──────────────────────────────────────────────────
 async function draftRef(): Promise<string> {
   const year = new Date().getFullYear();
-  const n    = (await prisma.application.count()) + 1;
-  return `DRAFT-${year}-${String(n).padStart(3, '0')}`;
+  let n = (await prisma.application.count()) + 1;
+  let ref = `DRAFT-${year}-${String(n).padStart(3, '0')}`;
+  while (await prisma.application.findFirst({ where: { referenceNumber: ref } })) {
+    n++;
+    ref = `DRAFT-${year}-${String(n).padStart(3, '0')}`;
+  }
+  return ref;
 }
 
 async function submittedRef(applicationType: string): Promise<string> {
@@ -49,9 +54,6 @@ export async function getMyApplications(applicantId: string, filters: Applicatio
   if (filters.applicationType) {
     const variants = TYPE_NORM[filters.applicationType] ?? [filters.applicationType];
     where.applicationType = { in: variants };
-  }
-  if (filters.workflowType) {
-    where.workflowType = filters.workflowType;
   }
   if (filters.stage) {
     where.stage = filters.stage;
@@ -89,7 +91,7 @@ export async function createDraft(applicantId: string, applicationType: string, 
 }
 
 function extractMeta(applicationType: string, fd: Record<string, unknown>): {
-  address: string; foodCategory: string; workflowType: string;
+  address: string; foodCategory: string;
 } {
   const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
@@ -97,7 +99,6 @@ function extractMeta(applicationType: string, fd: Record<string, unknown>): {
     return {
       address:      s(fd.registeredOfficeAddress) || s(fd.manufacturingAddress),
       foodCategory: s(fd.ayurvedaCategory),
-      workflowType: s(fd.workflowType) || 'New',
     };
   }
 
@@ -105,7 +106,6 @@ function extractMeta(applicationType: string, fd: Record<string, unknown>): {
     return {
       address:      s(fd.applicantAddress),
       foodCategory: s(fd.productCategory),
-      workflowType: s(fd.workflowType) || 'New',
     };
   }
 
@@ -113,7 +113,6 @@ function extractMeta(applicationType: string, fd: Record<string, unknown>): {
     return {
       address:      s(fd.addressOfPremise),
       foodCategory: 'FCM-rPET Packaging',
-      workflowType: s(fd.workflowType) || 'New',
     };
   }
 
@@ -122,7 +121,6 @@ function extractMeta(applicationType: string, fd: Record<string, unknown>): {
   return {
     address:      s(step2.orgAddress) || s(step2.mfgAddress),
     foodCategory: s(step2.productCategory),
-    workflowType: s(fd.workflowType) || 'New',
   };
 }
 
@@ -138,7 +136,6 @@ export async function saveDraft(id: string, applicantId: string, formData: objec
       ...(productName       ? { productName }           : {}),
       ...(meta.address      ? { address: meta.address } : {}),
       ...(meta.foodCategory ? { foodCategory: meta.foodCategory } : {}),
-      workflowType: meta.workflowType,
     },
   });
 }

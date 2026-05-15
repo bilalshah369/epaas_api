@@ -156,7 +156,9 @@ model Appeal {
   application     Application @relation(fields: [applicationId], references: [id])
   applicantId     String      @map("applicant_id")
   applicant       User        @relation("AppealsByUser", fields: [applicantId], references: [id])
-  grounds         String
+  grounds          String
+  attachmentUrl    String?     @map("attachment_url")
+  authorityDocUrl  String?     @map("authority_doc_url")
   // AppealPending | AppealApproved | AppealRejected
   status          String      @default("AppealPending")
   filedAt         DateTime    @default(now()) @map("filed_at")
@@ -180,7 +182,9 @@ model Review {
   appeal          Appeal      @relation(fields: [appealId], references: [id])
   applicantId     String      @map("applicant_id")
   applicant       User        @relation("ReviewsByUser", fields: [applicantId], references: [id])
-  grounds         String
+  grounds          String
+  attachmentUrl    String?     @map("attachment_url")
+  authorityDocUrl  String?     @map("authority_doc_url")
   // ReviewPending | ReviewDisposed | DeadlinePassed
   status          String      @default("ReviewPending")
   filedAt         DateTime    @default(now()) @map("filed_at")

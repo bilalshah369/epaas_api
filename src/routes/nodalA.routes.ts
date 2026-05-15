@@ -4,6 +4,7 @@ import { checkRole }   from '../middleware/role.middleware';
 import {
   listPending, listAll, forwardToTechnical, listAppealsReport, listReviewsReport, listAppealReview, listExtensionRequests,
   sendDecisionToApplicant, dispatchAppealDecision, dispatchReviewDecision,
+  uploadAppealAuthorityDoc, uploadReviewAuthorityDoc,
 } from '../controllers/nodalA.controller';
 
 const router  = Router();
@@ -17,8 +18,10 @@ router.get('/appeal-review',             ...nodalA, listAppealReview);
 router.get('/extension-requests',        ...nodalA, listExtensionRequests);
 router.post('/applications/:id/forward',       ...nodalA, forwardToTechnical);
 router.post('/applications/:id/send-decision', ...nodalA, sendDecisionToApplicant);
-router.post('/appeals/:id/dispatch',           ...nodalA, dispatchAppealDecision);
-router.post('/reviews/:id/dispatch',           ...nodalA, dispatchReviewDecision);
+router.post ('/appeals/:id/dispatch',           ...nodalA, dispatchAppealDecision);
+router.post ('/reviews/:id/dispatch',           ...nodalA, dispatchReviewDecision);
+router.patch('/appeals/:id/upload-authority-doc',  ...nodalA, uploadAppealAuthorityDoc);
+router.patch('/reviews/:id/upload-authority-doc',  ...nodalA, uploadReviewAuthorityDoc);
 // Return with query: uses existing POST /api/applications/:id/queries (verifyToken only)
 
 export default router;

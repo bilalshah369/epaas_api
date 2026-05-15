@@ -4,13 +4,15 @@ import { listAppeals, fileAppeal, listReviews, fileReview } from '../services/ap
 import { AppError } from '../middleware/errorHandler.middleware';
 
 const appealSchema = z.object({
-  applicationId: z.string().uuid(),
-  grounds:       z.string().min(10, 'Grounds must be at least 10 characters'),
+  applicationId: z.string().min(1),
+  grounds:       z.string().min(1, 'Grounds for appeal are required'),
+  attachmentUrl: z.string().optional().nullable(),
 });
 
 const reviewSchema = z.object({
-  appealId: z.string().uuid(),
-  grounds:  z.string().min(10, 'Grounds must be at least 10 characters'),
+  appealId:      z.string().min(1),
+  grounds:       z.string().min(1, 'Grounds for review are required'),
+  attachmentUrl: z.string().optional().nullable(),
 });
 
 // GET /api/appeals
@@ -24,9 +26,13 @@ export async function getAppeals(req: Request, res: Response, next: NextFunction
 // POST /api/appeals
 export async function createAppeal(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log('[appeal] req.body:', JSON.stringify(req.body));
     const body = appealSchema.safeParse(req.body);
-    if (!body.success) throw new AppError(body.error.errors[0].message, 422);
-    const appeal = await fileAppeal(req.user!.userId, body.data.applicationId, body.data.grounds);
+    if (!body.success) {
+      console.error('[appeal] Zod validation failed:', JSON.stringify(body.error.errors));
+      throw new AppError(body.error.errors.map((e) => e.message).join('; '), 422);
+    }
+    const appeal = await fileAppeal(req.user!.userId, body.data.applicationId, body.data.grounds, body.data.attachmentUrl ?? undefined);
     res.status(201).json({ appeal });
   } catch (e) { next(e); }
 }
@@ -44,7 +50,7 @@ export async function createReview(req: Request, res: Response, next: NextFuncti
   try {
     const body = reviewSchema.safeParse(req.body);
     if (!body.success) throw new AppError(body.error.errors[0].message, 422);
-    const review = await fileReview(req.user!.userId, body.data.appealId, body.data.grounds);
+    const review = await fileReview(req.user!.userId, body.data.appealId, body.data.grounds, body.data.attachmentUrl ?? undefined);
     res.status(201).json({ review });
   } catch (e) { next(e); }
 }

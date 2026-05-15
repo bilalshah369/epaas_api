@@ -112,6 +112,28 @@ export async function dispatchAppealDecision(req: Request, res: Response, next: 
   } catch (e) { next(e); }
 }
 
+// PATCH /api/nodal-a/appeals/:id/upload-authority-doc  →  save authority response document URL
+export async function uploadAppealAuthorityDoc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as { id: string };
+    const { authorityDocUrl } = req.body as { authorityDocUrl?: string };
+    if (!authorityDocUrl?.trim()) throw new AppError('authorityDocUrl is required', 400);
+    const appeal = await prisma.appeal.update({ where: { id }, data: { authorityDocUrl } });
+    res.json({ appeal });
+  } catch (e) { next(e); }
+}
+
+// PATCH /api/nodal-a/reviews/:id/upload-authority-doc  →  save authority response document URL
+export async function uploadReviewAuthorityDoc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as { id: string };
+    const { authorityDocUrl } = req.body as { authorityDocUrl?: string };
+    if (!authorityDocUrl?.trim()) throw new AppError('authorityDocUrl is required', 400);
+    const review = await prisma.review.update({ where: { id }, data: { authorityDocUrl } });
+    res.json({ review });
+  } catch (e) { next(e); }
+}
+
 // POST /api/nodal-a/reviews/:id/dispatch  →  Rejected (ReviewDisposed — CEO upheld)
 export async function dispatchReviewDecision(req: Request, res: Response, next: NextFunction) {
   try {
