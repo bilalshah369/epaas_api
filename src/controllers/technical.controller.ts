@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
@@ -114,7 +115,7 @@ export async function recordDecision(req: Request, res: Response, next: NextFunc
     const toDecision = { ...existing, decision, conditions: conditions ?? '', reasons: reasons ?? '', form2Data: form2Data ?? {}, recordedAt: new Date().toISOString() };
     const application = await prisma.application.update({
       where: { id },
-      data: { toDecision, stage: 'WithNodalOfficerA' },
+      data: { toDecision: toDecision as Prisma.InputJsonValue, stage: 'WithNodalOfficerA' },
     });
     res.json({ application });
   } catch (e) { next(e); }
