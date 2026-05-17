@@ -51,9 +51,10 @@ model User {
   queriesAsked      Query[]            @relation("QueriesAsked")
   queriesResponded  Query[]            @relation("QueriesResponded")
   documents         Document[]
-  appeals           Appeal[]           @relation("AppealsByUser")
-  reviews           Review[]           @relation("ReviewsByUser")
-  extensionRequests ExtensionRequest[] @relation("ExtensionsByUser")
+  appeals              Appeal[]           @relation("AppealsByUser")
+  reviews              Review[]           @relation("ReviewsByUser")
+  extensionRequests    ExtensionRequest[] @relation("ExtensionsByUser")
+  withdrawalRequests   WithdrawalRequest[] @relation("WithdrawalsByUser")
 
   @@map("users")
 }
@@ -91,11 +92,12 @@ model Application {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  queries          Query[]
-  documents        Document[]
-  appeals          Appeal[]
-  reviews          Review[]
-  extensionRequests ExtensionRequest[]
+  queries            Query[]
+  documents          Document[]
+  appeals            Appeal[]
+  reviews            Review[]
+  extensionRequests  ExtensionRequest[]
+  withdrawalRequests WithdrawalRequest[]
 
   @@map("applications")
 }
@@ -144,6 +146,8 @@ model Query {
   nodalFwdResponseAt   DateTime?  @map("nodal_fwd_response_at")   // null = waiting for Nodal to forward response to Tech
 
   createdAt           DateTime    @default(now()) @map("created_at")
+
+  extensionRequest    ExtensionRequest?
 
   @@map("queries")
 }
@@ -204,6 +208,9 @@ model ExtensionRequest {
   application      Application @relation(fields: [applicationId], references: [id])
   applicantId      String      @map("applicant_id")
   applicant        User        @relation("ExtensionsByUser", fields: [applicantId], references: [id])
+  // Optional link to the specific query this extension is for (one extension per query)
+  queryId          String?     @unique @map("query_id")
+  query            Query?      @relation(fields: [queryId], references: [id])
   reason           String
   extensionDays    Int         @map("extension_days")
   contactEmail     String      @map("contact_email")
@@ -215,4 +222,24 @@ model ExtensionRequest {
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   @@map("extension_requests")
+}
+
+// ── Withdrawal Requests ────────────────────────────────────────────────────────
+// Applicant requests withdrawal of any non-rejected submitted application.
+// Nodal Officer A can also directly withdraw an approved application.
+model WithdrawalRequest {
+  id             String      @id @default(uuid())
+  applicationId  String      @map("application_id")
+  application    Application @relation(fields: [applicationId], references: [id])
+  requestedById  String      @map("requested_by_id")
+  requestedBy    User        @relation("WithdrawalsByUser", fields: [requestedById], references: [id])
+  // ByApplicant | ByAuthority
+  type           String
+  justification  String
+  // Pending | Approved | Rejected | Executed
+  status         String      @default("Pending")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@map("withdrawal_requests")
 }

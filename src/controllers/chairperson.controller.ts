@@ -52,7 +52,31 @@ export async function listExtensions(req: Request, res: Response, next: NextFunc
 }
 
 // POST /api/chairperson/reviews/:id/dispose  →  ReviewDisposed + application → WithNodalOfficerA
+// Stores pendingReviewId in toDecision so Nodal knows to call dispatchReviewDecision
 export async function disposeReview(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const { decisionRemarks } = req.body as { decisionRemarks?: string };
+    if (!decisionRemarks?.trim()) throw new AppError('decisionRemarks is required', 400);
+    const review = await prisma.review.findUnique({ where: { id }, include: { application: true } });
+    if (!review) throw new AppError('Review not found', 404);
+    if (review.status !== 'ReviewPending') {
+      throw new AppError(`Cannot dispose: review status is "${review.status}"`, 400);
+    }
+    const currentTd = (review.application.toDecision as Record<string, unknown>) ?? {};
+    const [updated] = await prisma.$transaction([
+      prisma.review.update({ where: { id }, data: { status: 'ReviewDisposed', decisionRemarks, decisionAt: new Date() } }),
+      prisma.application.update({
+        where: { id: review.applicationId },
+        data: { stage: 'WithNodalOfficerA', toDecision: { ...currentTd, pendingReviewId: id } },
+      }),
+    ]);
+    res.json({ review: updated });
+  } catch (e) { next(e); }
+}
+
+// POST /api/chairperson/reviews/:id/approve  →  ReviewApproved + resets workflow (toDecision cleared, app → WithNodalOfficerA)
+export async function approveReview(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
     const { decisionRemarks } = req.body as { decisionRemarks?: string };
@@ -60,11 +84,12 @@ export async function disposeReview(req: Request, res: Response, next: NextFunct
     const review = await prisma.review.findUnique({ where: { id } });
     if (!review) throw new AppError('Review not found', 404);
     if (review.status !== 'ReviewPending') {
-      throw new AppError(`Cannot dispose: review status is "${review.status}"`, 400);
+      throw new AppError(`Cannot approve: review status is "${review.status}"`, 400);
     }
     const [updated] = await prisma.$transaction([
-      prisma.review.update({ where: { id }, data: { status: 'ReviewDisposed', decisionRemarks, decisionAt: new Date() } }),
-      prisma.application.update({ where: { id: review.applicationId }, data: { stage: 'WithNodalOfficerA' } }),
+      prisma.review.update({ where: { id }, data: { status: 'ReviewApproved', decisionRemarks, decisionAt: new Date() } }),
+      // Clear toDecision so Nodal sees the normal scrutiny workflow again
+      prisma.application.update({ where: { id: review.applicationId }, data: { stage: 'WithNodalOfficerA', toDecision: null } }),
     ]);
     res.json({ review: updated });
   } catch (e) { next(e); }

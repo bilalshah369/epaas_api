@@ -16,13 +16,23 @@ export async function createExtension(
   extensionDays: number,
   contactEmail:  string,
   justification: string,
+  queryId?:      string,
 ) {
   const app = await prisma.application.findUnique({ where: { id: applicationId } });
   if (!app)                          throw new AppError('Application not found', 404);
   if (app.applicantId !== applicantId) throw new AppError('Forbidden', 403);
 
-  return prisma.extensionRequest.create({
-    data: { applicationId, applicantId, reason, extensionDays, contactEmail, justification, status: 'Pending' },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const extModel = prisma.extensionRequest as any;
+
+  // One extension per query — prevent duplicate filing
+  if (queryId) {
+    const existing = await extModel.findFirst({ where: { queryId } });
+    if (existing) throw new AppError('An extension request has already been filed for this query', 400);
+  }
+
+  return extModel.create({
+    data: { applicationId, applicantId, reason, extensionDays, contactEmail, justification, status: 'Pending', ...(queryId ? { queryId } : {}) },
     include: { application: { select: { referenceNumber: true, applicationType: true, foodCategory: true, productName: true } } },
   });
 }

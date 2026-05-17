@@ -38,16 +38,17 @@ export async function listAppeals(applicantId: string) {
   }));
 
   const filed = appeals.map((ap) => ({
-    id:            ap.id,
-    applicationId: ap.applicationId,
-    ref:           ap.application.referenceNumber,
-    company:       ap.application.companyName,
-    product:       ap.application.productName ?? '—',
-    appType:       ap.application.applicationType,
-    foodCategory:  ap.application.foodCategory,
-    rejDate:       (ap.application.rejectedAt ?? ap.application.updatedAt).toISOString(),
-    daysLeft:      0,
-    appealStatus:  ap.status as 'AppealPending' | 'AppealApproved' | 'AppealRejected',
+    id:              ap.id,
+    applicationId:   ap.applicationId,
+    ref:             ap.application.referenceNumber,
+    company:         ap.application.companyName,
+    product:         ap.application.productName ?? '—',
+    appType:         ap.application.applicationType,
+    foodCategory:    ap.application.foodCategory,
+    rejDate:         (ap.application.rejectedAt ?? ap.application.updatedAt).toISOString(),
+    daysLeft:        0,
+    appealStatus:    ap.status as 'AppealPending' | 'AppealApproved' | 'AppealRejected',
+    decisionRemarks: ap.decisionRemarks ?? null,
   }));
 
   return [...pendingFiling, ...filed];
@@ -133,7 +134,8 @@ export async function fileReview(applicantId: string, appealId: string, grounds:
   const window = daysLeft(appeal.decisionAt ?? appeal.updatedAt, REVIEW_WINDOW_DAYS);
   if (window === 0) throw new AppError('Review window has expired', 400);
 
-  return prisma.review.create({
+  const currentTd = (appeal.application.toDecision as Record<string, unknown>) ?? {};
+  const review = await prisma.review.create({
     data: {
       applicationId: appeal.applicationId,
       appealId,
@@ -142,6 +144,14 @@ export async function fileReview(applicantId: string, appealId: string, grounds:
       attachmentUrl: attachmentUrl ?? null,
       status: 'ReviewPending',
     },
+  });
+  // Route to Nodal A (not Chairperson) — Nodal A must forward it manually
+  await prisma.application.update({
+    where: { id: appeal.applicationId },
+    data: { stage: 'WithNodalOfficerA', toDecision: { ...currentTd, reviewPendingForward: review.id } },
+  });
+  return prisma.review.findUniqueOrThrow({
+    where: { id: review.id },
     include: { application: true, appeal: true },
   });
 }

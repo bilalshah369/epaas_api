@@ -9,7 +9,7 @@ import {
   deleteDraft,
 } from '../services/application.service';
 import { AppError } from '../middleware/errorHandler.middleware';
-
+import { prisma } from '../config/db';
 const createSchema = z.object({
   applicationType: z.string().min(1),
   companyName:     z.string().min(1),
@@ -64,5 +64,83 @@ export async function deleteDraftApp(req: Request, res: Response, next: NextFunc
   try {
     await deleteDraft(req.params.id as string, req.user!.userId);
     res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
+// POST /api/applications/:id/send-certificate  →  email Form II certificate to applicant's registered email
+export async function sendCertificateEmail(req: Request, res: Response, next: NextFunction) {
+  try {
+    const app = await prisma.application.findUnique({
+      where: { id: req.params.id },
+      include: { applicant: { select: { email: true, name: true } } },
+    });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
+    if (app.stage !== 'Approved') throw new AppError('Certificate is only available for approved applications', 400);
+    const toEmail = app.applicant.email;
+    const name    = app.applicant.name ?? 'Applicant';
+    // ── Send via nodemailer if SMTP is configured ──────────────────────────────
+    const SMTP_HOST = process.env['SMTP_HOST'];
+    if (SMTP_HOST) {
+      const nodemailer = await import('nodemailer');
+      const transporter = nodemailer.default.createTransport({
+        host:   SMTP_HOST,
+        port:   Number(process.env['SMTP_PORT'] ?? 587),
+        secure: process.env['SMTP_SECURE'] === 'true',
+        auth:   { user: process.env['SMTP_USER'], pass: process.env['SMTP_PASS'] },
+      });
+      await transporter.sendMail({
+        from:    process.env['SMTP_FROM'] ?? 'noreply@epaas.gov.in',
+        to:      toEmail,
+        subject: `FSSAI E-PAAS — Approval Certificate for ${app.referenceNumber}`,
+        html: `<p>Dear ${name},</p>
+               <p>Congratulations! Your application <strong>${app.referenceNumber}</strong> has been <strong>approved</strong> by FSSAI.</p>
+               <p>Please login to the E-PAAS portal and navigate to <em>My Applications → Decision History</em> to download your Form II certificate.</p>
+               <p><strong>Application Ref:</strong> ${app.referenceNumber}<br>
+               <strong>Company:</strong> ${app.companyName}<br>
+               <strong>Product:</strong> ${app.productName ?? '—'}</p>
+               <p>Regards,<br>FSSAI E-PAAS System</p>`,
+      });
+    } else {
+      console.log(`[send-certificate] SMTP not configured — would email "${toEmail}" for app ${app.referenceNumber}`);
+    }
+    res.json({ success: true, sentTo: toEmail });
+  } catch (err) { next(err); }
+}
+
+// POST /api/applications/:id/submit-pms-report  →  applicant uploads PMS monitoring report
+export async function submitPmsReport(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { storedName, originalName } = req.body as { storedName?: string; originalName?: string };
+    if (!storedName?.trim()) throw new AppError('storedName is required', 400);
+    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
+    if (app.stage !== 'Approved') throw new AppError('PMS report can only be submitted for approved applications', 400);
+    const td = (app.toDecision as Record<string, unknown>) ?? {};
+    if (!td.withPms) throw new AppError('This application does not have a PMS condition', 400);
+    const doc = await prisma.document.create({
+      data: { applicationId: app.id, fieldName: 'pmsReport', originalName: originalName ?? storedName, storedName, mimeType: 'application/octet-stream', size: 0, uploadedById: req.user!.userId },
+    });
+    res.status(201).json({ document: doc });
+  } catch (err) { next(err); }
+}
+
+// POST /api/applications/:id/request-withdrawal  →  applicant requests withdrawal
+export async function requestWithdrawal(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { justification } = req.body as { justification?: string };
+    if (!justification?.trim()) throw new AppError('Justification is required', 400);
+    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    if (!app) throw new AppError('Application not found', 404);
+    if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
+    const INELIGIBLE = ['Draft', 'Rejected', 'Withdrawn', 'WithdrawnByAuthority'];
+    if (INELIGIBLE.includes(app.stage)) throw new AppError(`Cannot withdraw application in stage: ${app.stage}`, 400);
+    const existing = await prisma.withdrawalRequest.findFirst({ where: { applicationId: app.id, status: 'Pending' } });
+    if (existing) throw new AppError('A withdrawal request is already pending for this application', 409);
+    const request = await prisma.withdrawalRequest.create({
+      data: { applicationId: app.id, requestedById: req.user!.userId, type: 'ByApplicant', justification: justification.trim(), status: 'Pending' },
+    });
+    res.status(201).json({ request });
   } catch (err) { next(err); }
 }
