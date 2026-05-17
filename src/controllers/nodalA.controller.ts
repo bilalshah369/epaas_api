@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
@@ -209,7 +210,7 @@ export async function forwardReviewToChairperson(req: Request, res: Response, ne
     const { reviewPendingForward, ...restTd } = currentTd;
     await prisma.application.update({
       where: { id: review.applicationId },
-      data: { stage: 'WithChairperson', toDecision: restTd },
+      data: { stage: 'WithChairperson', toDecision: restTd as Prisma.InputJsonValue },
     });
     res.json({ success: true });
   } catch (e) { next(e); }

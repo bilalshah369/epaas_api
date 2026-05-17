@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
@@ -89,7 +90,7 @@ export async function approveReview(req: Request, res: Response, next: NextFunct
     const [updated] = await prisma.$transaction([
       prisma.review.update({ where: { id }, data: { status: 'ReviewApproved', decisionRemarks, decisionAt: new Date() } }),
       // Clear toDecision so Nodal sees the normal scrutiny workflow again
-      prisma.application.update({ where: { id: review.applicationId }, data: { stage: 'WithNodalOfficerA', toDecision: null } }),
+      prisma.application.update({ where: { id: review.applicationId }, data: { stage: 'WithNodalOfficerA', toDecision: Prisma.DbNull } }),
     ]);
     res.json({ review: updated });
   } catch (e) { next(e); }
