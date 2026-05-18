@@ -38,7 +38,7 @@ RUN npm ci --omit=dev
 # Copy build output and Prisma files
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY prisma ./prisma
+COPY --from=builder /app/prisma ./prisma
 COPY entrypoint.sh ./entrypoint.sh
 
 # IMPORTANT: copy generated Prisma client
