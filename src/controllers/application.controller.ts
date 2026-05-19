@@ -71,7 +71,7 @@ export async function deleteDraftApp(req: Request, res: Response, next: NextFunc
 export async function sendCertificateEmail(req: Request, res: Response, next: NextFunction) {
   try {
     const app = await prisma.application.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { applicant: { select: { email: true, name: true } } },
     });
     if (!app) throw new AppError('Application not found', 404);
@@ -82,6 +82,7 @@ export async function sendCertificateEmail(req: Request, res: Response, next: Ne
     // ── Send via nodemailer if SMTP is configured ──────────────────────────────
     const SMTP_HOST = process.env['SMTP_HOST'];
     if (SMTP_HOST) {
+      // @ts-ignore - nodemailer is an optional runtime dependency
       const nodemailer = await import('nodemailer');
       const transporter = nodemailer.default.createTransport({
         host:   SMTP_HOST,
@@ -113,7 +114,7 @@ export async function submitPmsReport(req: Request, res: Response, next: NextFun
   try {
     const { storedName, originalName } = req.body as { storedName?: string; originalName?: string };
     if (!storedName?.trim()) throw new AppError('storedName is required', 400);
-    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    const app = await prisma.application.findUnique({ where: { id: req.params.id as string } });
     if (!app) throw new AppError('Application not found', 404);
     if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
     if (app.stage !== 'Approved') throw new AppError('PMS report can only be submitted for approved applications', 400);
@@ -131,7 +132,7 @@ export async function requestWithdrawal(req: Request, res: Response, next: NextF
   try {
     const { justification } = req.body as { justification?: string };
     if (!justification?.trim()) throw new AppError('Justification is required', 400);
-    const app = await prisma.application.findUnique({ where: { id: req.params.id } });
+    const app = await prisma.application.findUnique({ where: { id: req.params.id as string } });
     if (!app) throw new AppError('Application not found', 404);
     if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
     const INELIGIBLE = ['Draft', 'Rejected', 'Withdrawn', 'WithdrawnByAuthority'];
