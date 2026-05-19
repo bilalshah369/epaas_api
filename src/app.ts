@@ -21,10 +21,6 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 
 const app = express();
 
-// Trust reverse proxy (Docker Swarm ingress / nginx) so express-rate-limit
-// can read the real client IP from X-Forwarded-For
-app.set('trust proxy', 1);
-
 // ── Security headers ───────────────────────────────────────────────────────
 app.use(helmet());
 

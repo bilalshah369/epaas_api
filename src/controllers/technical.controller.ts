@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
+import { mergeSupDoc } from '../services/extension.service';
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
@@ -32,10 +33,11 @@ export async function listAppealReview(req: Request, res: Response, next: NextFu
 // GET /api/technical/extension-requests  →  all extension requests
 export async function listExtensionRequests(req: Request, res: Response, next: NextFunction) {
   try {
-    const requests = await prisma.extensionRequest.findMany({
+    const raw = await prisma.extensionRequest.findMany({
       include: { application: { include: APP_INCLUDE } },
       orderBy: { createdAt: 'desc' },
     });
+    const requests = await mergeSupDoc(raw);
     res.json({ requests });
   } catch (e) { next(e); }
 }

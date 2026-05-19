@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
+import { mergeSupDoc } from '../services/extension.service';
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
@@ -46,10 +46,11 @@ export async function listAppealReview(req: Request, res: Response, next: NextFu
 // GET /api/nodal-a/extension-requests  →  all extension requests with application
 export async function listExtensionRequests(req: Request, res: Response, next: NextFunction) {
   try {
-    const requests = await prisma.extensionRequest.findMany({
+    const raw = await prisma.extensionRequest.findMany({
       include: { application: { include: APP_INCLUDE } },
       orderBy: { createdAt: 'desc' },
     });
+    const requests = await mergeSupDoc(raw);
     res.json({ requests });
   } catch (e) { next(e); }
 }
@@ -210,7 +211,7 @@ export async function forwardReviewToChairperson(req: Request, res: Response, ne
     const { reviewPendingForward, ...restTd } = currentTd;
     await prisma.application.update({
       where: { id: review.applicationId },
-      data: { stage: 'WithChairperson', toDecision: restTd as Prisma.InputJsonValue },
+      data: { stage: 'WithChairperson', toDecision: restTd },
     });
     res.json({ success: true });
   } catch (e) { next(e); }

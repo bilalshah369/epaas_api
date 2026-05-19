@@ -4,12 +4,13 @@ import { listExtensions, createExtension, updateExtension } from '../services/ex
 import { AppError } from '../middleware/errorHandler.middleware';
 
 const extSchema = z.object({
-  applicationId: z.string().uuid(),
-  reason:        z.string().min(1),
-  extensionDays: z.number().int().positive(),
-  contactEmail:  z.string().email().or(z.literal('')),
-  justification: z.string().min(10),
-  queryId:       z.string().uuid().optional(),
+  applicationId:     z.string().uuid(),
+  reason:            z.string().min(1),
+  extensionDays:     z.number().int().positive(),
+  contactEmail:      z.string().email().or(z.literal('')),
+  justification:     z.string().min(10),
+  queryId:           z.string().uuid().optional(),
+  supportingDocument: z.string().optional(),
 });
 
 const extUpdateSchema = z.object({
@@ -32,8 +33,8 @@ export async function createExt(req: Request, res: Response, next: NextFunction)
   try {
     const body = extSchema.safeParse(req.body);
     if (!body.success) throw new AppError(body.error.errors[0].message, 422);
-    const { applicationId, reason, extensionDays, contactEmail, justification, queryId } = body.data;
-    const ext = await createExtension(req.user!.userId, applicationId, reason, extensionDays, contactEmail, justification, queryId);
+    const { applicationId, reason, extensionDays, contactEmail, justification, queryId, supportingDocument } = body.data;
+    const ext = await createExtension(req.user!.userId, applicationId, reason, extensionDays, contactEmail, justification, queryId, supportingDocument);
     res.status(201).json({ extension: ext });
   } catch (e) { next(e); }
 }
