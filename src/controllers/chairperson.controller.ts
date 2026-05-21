@@ -25,11 +25,11 @@ export async function listAll(req: Request, res: Response, next: NextFunction) {
   } catch (e) { next(e); }
 }
 
-// GET /api/chairperson/reviews  →  ReviewPending queue
+// GET /api/chairperson/reviews  →  only reviews forwarded to Chairperson by Nodal (application stage = WithChairperson)
 export async function listReviews(req: Request, res: Response, next: NextFunction) {
   try {
     const reviews = await prisma.review.findMany({
-      where: { status: 'ReviewPending' },
+      where: { status: 'ReviewPending', application: { stage: 'WithChairperson' } },
       include: {
         application: { include: APP_INCLUDE },
         applicant: { select: { username: true, email: true } },

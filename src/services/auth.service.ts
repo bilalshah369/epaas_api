@@ -12,11 +12,12 @@ type UserWithRole = User & { role: Role };
 
 function signToken(user: UserWithRole): string {
   const payload: JwtPayload = {
-    userId:   user.id,
-    username: user.username,
-    email:    user.email,
-    roleCode: user.role.roleCode,
-    roleName: user.role.roleName,
+    userId:             user.id,
+    username:           user.username,
+    email:              user.email,
+    roleCode:           user.role.roleCode,
+    roleName:           user.role.roleName,
+    assignedCategories: (user as any).assignedCategories ?? [],
   };
   return jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: process.env.JWT_EXPIRES_IN ?? '8h',
@@ -25,18 +26,19 @@ function signToken(user: UserWithRole): string {
 
 function toPublicUser(user: UserWithRole) {
   return {
-    id:              user.id,
-    username:        user.username,
-    email:           user.email,
-    roleCode:        user.role.roleCode,
-    roleName:        user.role.roleName,
-    licenseNumber:   user.licenseNumber  ?? undefined,
-    officeLocation:  user.officeLocation ?? undefined,
-    isActive:        user.isActive,
-    name:            user.name            ?? undefined,
-    mobile:          user.mobile          ?? undefined,
-    orgName:         user.orgName         ?? undefined,
-    natureOfBusiness:user.natureOfBusiness ?? undefined,
+    id:                 user.id,
+    username:           user.username,
+    email:              user.email,
+    roleCode:           user.role.roleCode,
+    roleName:           user.role.roleName,
+    licenseNumber:      user.licenseNumber   ?? undefined,
+    officeLocation:     user.officeLocation  ?? undefined,
+    assignedCategories: (user as any).assignedCategories ?? [],
+    isActive:           user.isActive,
+    name:               user.name             ?? undefined,
+    mobile:             user.mobile           ?? undefined,
+    orgName:            user.orgName          ?? undefined,
+    natureOfBusiness:   user.natureOfBusiness ?? undefined,
   };
 }
 

@@ -66,10 +66,16 @@ export async function fileAppeal(applicantId: string, applicationId: string, gro
   const window = daysLeft(app.rejectedAt ?? app.updatedAt, APPEAL_WINDOW_DAYS);
   if (window === 0) throw new AppError('Appeal window has expired', 400);
 
-  return prisma.appeal.create({
+  const appeal = await prisma.appeal.create({
     data: { applicationId, applicantId, grounds, attachmentUrl: attachmentUrl ?? null, status: 'AppealPending' },
     include: { application: true },
   });
+  // Route to Nodal A first — Nodal uploads authority response doc then forwards to CEO
+  await prisma.application.update({
+    where: { id: applicationId },
+    data:  { stage: 'WithNodalOfficerA' },
+  });
+  return appeal;
 }
 
 // ── Review ────────────────────────────────────────────────────────────────────

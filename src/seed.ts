@@ -14,7 +14,7 @@ import { ROLES } from './config/constants';
 
 const ROLES_SEED = [
   { roleCode: ROLES.APPLICANT,         roleName: 'Applicant',          description: 'Submits applications, responds to queries, files appeals and reviews' },
-  { roleCode: ROLES.NODAL_OFFICER_A,   roleName: 'Nodal Officer A',    description: 'Receives applications, assigns Technical Officers, dispatches decisions' },
+  { roleCode: ROLES.NODAL_OFFICER_A,   roleName: 'Nodal Officer',      description: 'Receives applications, assigns Technical Officers, dispatches decisions' },
   { roleCode: ROLES.TECHNICAL_OFFICER, roleName: 'Technical Officer',  description: 'Reviews documents, performs scrutiny, drafts queries, prepares decision letters' },
   { roleCode: ROLES.EXPERT_COMMITTEE,  roleName: 'Expert Committee',   description: 'Evaluates referred applications, records Approved/Rejected/Clarification decision' },
   { roleCode: ROLES.NODAL_POINT_B,     roleName: 'Nodal Point B',      description: 'Uploads final EC-approved decision into E-PAAS' },

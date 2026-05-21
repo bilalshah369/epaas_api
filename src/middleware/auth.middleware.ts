@@ -7,6 +7,7 @@ export interface JwtPayload {
   email: string;
   roleCode: string;
   roleName: string;
+  assignedCategories: string[];
 }
 
 export function verifyToken(req: Request, res: Response, next: NextFunction) {

@@ -6,28 +6,29 @@ import { mergeSupDoc } from '../services/extension.service';
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
-// GET /api/ec/all
+// GET /api/ec/all  →  all non-draft applications assigned to this EC member
 export async function listAll(req: Request, res: Response, next: NextFunction) {
   try {
-    const applications = await getAllApplications();
+    const applications = await getAllApplications(req.user!.userId, 'assignedECId');
     res.json({ applications });
   } catch (e) { next(e); }
 }
 
-// GET /api/ec/applications  →  WithExpertCommittee queue
+// GET /api/ec/applications  →  WithExpertCommittee assigned to this EC member
 export async function listPending(req: Request, res: Response, next: NextFunction) {
   try {
-    const applications = await getApplicationsByStage('WithExpertCommittee');
+    const applications = await getApplicationsByStage('WithExpertCommittee', req.user!.userId, 'assignedECId');
     res.json({ applications });
   } catch (e) { next(e); }
 }
 
-// GET /api/ec/appeal-review
+// GET /api/ec/appeal-review  →  appeal + review records for apps assigned to this EC member
 export async function listAppealReview(req: Request, res: Response, next: NextFunction) {
   try {
+    const userId = req.user!.userId;
     const [appeals, reviews] = await Promise.all([
-      prisma.appeal.findMany({ include: { application: { include: APP_INCLUDE } }, orderBy: { filedAt: 'desc' } }),
-      prisma.review.findMany({ include: { application: { include: APP_INCLUDE } }, orderBy: { filedAt: 'desc' } }),
+      prisma.appeal.findMany({ where: { application: { assignedECId: userId } }, include: { application: { include: APP_INCLUDE } }, orderBy: { filedAt: 'desc' } }),
+      prisma.review.findMany({ where: { application: { assignedECId: userId } }, include: { application: { include: APP_INCLUDE } }, orderBy: { filedAt: 'desc' } }),
     ]);
     const records = [
       ...appeals.map((a) => ({ ...a, type: 'Appeal' as const })),
@@ -37,10 +38,12 @@ export async function listAppealReview(req: Request, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
-// GET /api/ec/extension-requests
+// GET /api/ec/extension-requests  →  extensions for apps assigned to this EC member
 export async function listExtensionRequests(req: Request, res: Response, next: NextFunction) {
   try {
+    const userId = req.user!.userId;
     const raw = await prisma.extensionRequest.findMany({
+      where: { application: { assignedECId: userId } },
       include: { application: { include: APP_INCLUDE } },
       orderBy: { createdAt: 'desc' },
     });
@@ -53,7 +56,7 @@ export async function listExtensionRequests(req: Request, res: Response, next: N
 export async function listAppealsReport(req: Request, res: Response, next: NextFunction) {
   try {
     const applications = await prisma.application.findMany({
-      where: { appeals: { some: {} } }, include: APP_INCLUDE, orderBy: { updatedAt: 'desc' },
+      where: { appeals: { some: {} }, assignedECId: req.user!.userId }, include: APP_INCLUDE, orderBy: { updatedAt: 'desc' },
     });
     res.json({ applications });
   } catch (e) { next(e); }
@@ -63,19 +66,20 @@ export async function listAppealsReport(req: Request, res: Response, next: NextF
 export async function listReviewsReport(req: Request, res: Response, next: NextFunction) {
   try {
     const applications = await prisma.application.findMany({
-      where: { reviews: { some: {} } }, include: APP_INCLUDE, orderBy: { updatedAt: 'desc' },
+      where: { reviews: { some: {} }, assignedECId: req.user!.userId }, include: APP_INCLUDE, orderBy: { updatedAt: 'desc' },
     });
     res.json({ applications });
   } catch (e) { next(e); }
 }
 
-// POST /api/ec/applications/:id/forward-technical  →  WithExpertCommittee → WithTechnicalOfficer
+// POST /api/ec/applications/:id/forward-technical  →  WithExpertCommittee → WithTechnicalOfficer (uses assignedTOId)
 export async function forwardToTechnicalOfficer(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
     const app = await prisma.application.findUnique({ where: { id } });
     if (!app) throw new AppError('Application not found', 404);
     if (app.stage !== 'WithExpertCommittee') throw new AppError(`Cannot forward: application is in "${app.stage}"`, 400);
+    if (!app.assignedTOId) throw new AppError('No Technical Officer assigned to this application', 400);
     const application = await prisma.application.update({
       where: { id },
       data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendApproval', forwardedAt: new Date().toISOString() } },
@@ -95,6 +99,7 @@ export async function rejectApplication(req: Request, res: Response, next: NextF
     if (app.stage !== 'WithExpertCommittee') {
       throw new AppError(`Cannot record rejection: application is in "${app.stage}"`, 400);
     }
+    if (!app.assignedTOId) throw new AppError('No Technical Officer assigned to this application', 400);
     const application = await prisma.application.update({
       where: { id },
       data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendRejection', ecRemarks: reason, forwardedAt: new Date().toISOString() } },

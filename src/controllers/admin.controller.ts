@@ -3,6 +3,10 @@ import bcrypt from 'bcryptjs';
 import { getAllApplications } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
+import { ROLES } from '../config/constants';
+
+const OFFICER_CREATION_ROLES = [ROLES.NODAL_OFFICER_A, ROLES.TECHNICAL_OFFICER, ROLES.EXPERT_COMMITTEE];
+const VALID_CATEGORIES = ['NSF', 'ClaimApproval', 'AyurvedaAahara', 'RPET', 'AnyOther'];
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
@@ -31,6 +35,17 @@ export async function listRoles(req: Request, res: Response, next: NextFunction)
   try {
     const roles = await prisma.role.findMany({
       where: { roleCode: { not: 'Applicant' } },
+      orderBy: { roleName: 'asc' },
+    });
+    res.json({ roles });
+  } catch (e) { next(e); }
+}
+
+// GET /api/admin/officer-creation-roles  →  only Nodal/TO/EC (for Add Officer dropdown)
+export async function listOfficerCreationRoles(req: Request, res: Response, next: NextFunction) {
+  try {
+    const roles = await prisma.role.findMany({
+      where: { roleCode: { in: OFFICER_CREATION_ROLES } },
       orderBy: { roleName: 'asc' },
     });
     res.json({ roles });
@@ -199,13 +214,23 @@ export async function getAuditTrail(req: Request, res: Response, next: NextFunct
 // POST /api/admin/officers  →  create new officer account
 export async function createOfficer(req: Request, res: Response, next: NextFunction) {
   try {
-    const { username, email, password, officeLocation, roleCode } = req.body as {
-      username?: string; email?: string; password?: string; officeLocation?: string; roleCode?: string;
+    const { username, email, password, officeLocation, roleCode, assignedCategories } = req.body as {
+      username?: string; email?: string; password?: string; officeLocation?: string;
+      roleCode?: string; assignedCategories?: string[];
     };
     if (!username?.trim()) throw new AppError('Username is required', 400);
     if (!email?.trim())    throw new AppError('Email is required', 400);
-    if (!password || password.length < 6) throw new AppError('Password must be at least 6 characters', 400);
+    if (!password) throw new AppError('Password is required', 400);
     if (!roleCode?.trim()) throw new AppError('Role is required', 400);
+
+    if (!OFFICER_CREATION_ROLES.includes(roleCode as any)) {
+      throw new AppError('Only Nodal Officer, Technical Officer, or Expert Committee roles can be created here', 400);
+    }
+
+    const categories: string[] = Array.isArray(assignedCategories)
+      ? assignedCategories.filter(c => VALID_CATEGORIES.includes(c))
+      : [];
+    if (categories.length === 0) throw new AppError('At least one application category must be assigned', 400);
 
     const role = await prisma.role.findUnique({ where: { roleCode } });
     if (!role) throw new AppError('Invalid role code', 400);
@@ -221,11 +246,66 @@ export async function createOfficer(req: Request, res: Response, next: NextFunct
         email: email.trim().toLowerCase(),
         passwordHash,
         officeLocation: officeLocation?.trim() || null,
+        assignedCategories: categories,
         isActive: true,
       },
       include: { role: { select: { roleCode: true, roleName: true } } },
     });
     res.status(201).json({ user });
+  } catch (e) { next(e); }
+}
+
+// PATCH /api/admin/officers/:id/profile  →  update officer profile info
+export async function updateOfficerProfile(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const { username, email, password, officeLocation, assignedCategories } = req.body as {
+      username?: string; email?: string; password?: string;
+      officeLocation?: string; assignedCategories?: string[];
+    };
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) throw new AppError('User not found', 404);
+
+    // Conflict check — skip self
+    if (username?.trim() || email?.trim()) {
+      const conflict = await prisma.user.findFirst({
+        where: { OR: [...(username?.trim() ? [{ username: username.trim() }] : []), ...(email?.trim() ? [{ email: email.trim().toLowerCase() }] : [])], NOT: { id } },
+      });
+      if (conflict) throw new AppError('Username or email already in use', 409);
+    }
+
+    const data: Record<string, unknown> = {};
+    if (username?.trim())      data.username       = username.trim();
+    if (email?.trim())         data.email          = email.trim().toLowerCase();
+    if (officeLocation !== undefined) data.officeLocation = officeLocation?.trim() || null;
+    if (Array.isArray(assignedCategories)) {
+      const cats = assignedCategories.filter(c => VALID_CATEGORIES.includes(c));
+      if (cats.length === 0) throw new AppError('At least one application category must be assigned', 400);
+      data.assignedCategories = cats;
+    }
+    if (password) {
+      data.passwordHash = await bcrypt.hash(password, 12);
+    }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: data as any,
+      include: { role: { select: { roleCode: true, roleName: true } } },
+    });
+    res.json({ user });
+  } catch (e) { next(e); }
+}
+
+// DELETE /api/admin/officers/:id  →  permanently delete an officer account
+export async function deleteOfficer(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const user = await prisma.user.findUnique({ where: { id }, include: { role: true } });
+    if (!user) throw new AppError('User not found', 404);
+    if (user.role.roleCode === ROLES.ADMIN) throw new AppError('Cannot delete the system admin account', 403);
+    if (user.role.roleCode === ROLES.APPLICANT) throw new AppError('Cannot delete applicant accounts from here', 403);
+    await prisma.user.delete({ where: { id } });
+    res.json({ success: true });
   } catch (e) { next(e); }
 }
 

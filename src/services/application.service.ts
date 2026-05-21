@@ -1,5 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
+import { autoAssignNodal } from './workflow.service';
 
 const SUBMITTED_STAGES = [
   'Submitted', 'WithNodalOfficerA', 'WithTechnicalOfficer',
@@ -175,13 +176,15 @@ export async function submitApplication(id: string, applicantId: string) {
     throw new AppError('Payment reference is required. Please complete the payment step before submitting.', 422);
   }
 
-  const newRef = await submittedRef(app.applicationType);
+  const newRef        = await submittedRef(app.applicationType);
+  const assignedNodalId = await autoAssignNodal(app.applicationType);
   return prisma.application.update({
     where: { id },
     data:  {
       referenceNumber: newRef,
       stage:           'WithNodalOfficerA',
       submittedAt:     new Date(),
+      ...(assignedNodalId ? { assignedNodalId } : {}),
     },
   });
 }

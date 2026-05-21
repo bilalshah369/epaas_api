@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { verifyToken } from '../middleware/auth.middleware';
 import { checkRole }   from '../middleware/role.middleware';
 import {
-  listPending, listAll, forwardToTechnical, listAppealsReport, listReviewsReport, listAppealReview, listExtensionRequests,
+  listPending, listAll, forwardToTechnical, eligibleTO, listAppealsReport, listReviewsReport, listAppealReview, listExtensionRequests,
   grantExtensionRequest, rejectExtensionRequest, createExtensionRequest,
-  sendDecisionToApplicant, dispatchAppealDecision, dispatchReviewDecision, forwardReviewToChairperson,
+  sendDecisionToApplicant, forwardAppealToCEO, dispatchAppealDecision, dispatchReviewDecision, forwardReviewToChairperson,
   uploadAppealAuthorityDoc, uploadReviewAuthorityDoc,
   listWithdrawalRequests, approveWithdrawalRequest, rejectWithdrawalRequest, withdrawByAuthority,
 } from '../controllers/nodalA.controller';
@@ -21,8 +21,10 @@ router.get ('/extension-requests',                          ...nodalA, listExten
 router.post('/extension-requests',                          ...nodalA, createExtensionRequest);
 router.post('/extension-requests/:id/grant',                ...nodalA, grantExtensionRequest);
 router.post('/extension-requests/:id/reject',               ...nodalA, rejectExtensionRequest);
+router.get ('/applications/:id/eligible-to',   ...nodalA, eligibleTO);
 router.post('/applications/:id/forward',       ...nodalA, forwardToTechnical);
 router.post('/applications/:id/send-decision', ...nodalA, sendDecisionToApplicant);
+router.post ('/appeals/:id/forward-to-ceo',     ...nodalA, forwardAppealToCEO);
 router.post ('/appeals/:id/dispatch',           ...nodalA, dispatchAppealDecision);
 router.post ('/reviews/:id/forward-to-chairperson', ...nodalA, forwardReviewToChairperson);
 router.post ('/reviews/:id/dispatch',               ...nodalA, dispatchReviewDecision);

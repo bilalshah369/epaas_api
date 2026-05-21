@@ -1,24 +1,25 @@
 import { Request, Response, NextFunction } from 'express';
-import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
+import { getApplicationsByStage, getAllApplications, advanceStage, getEligibleOfficers } from '../services/workflow.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { mergeSupDoc } from '../services/extension.service';
 import { Prisma } from '@prisma/client';
+import { ROLES } from '../config/constants';
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
-// GET /api/nodal-a/applications  →  only WithNodalOfficerA (scrutiny queue)
+// GET /api/nodal-a/applications  →  only WithNodalOfficerA assigned to this officer
 export async function listPending(req: Request, res: Response, next: NextFunction) {
   try {
-    const applications = await getApplicationsByStage('WithNodalOfficerA');
+    const applications = await getApplicationsByStage('WithNodalOfficerA', req.user!.userId, 'assignedNodalId');
     res.json({ applications });
   } catch (e) { next(e); }
 }
 
-// GET /api/nodal-a/all  →  all non-draft applications (dashboard overview)
+// GET /api/nodal-a/all  →  all non-draft applications assigned to this officer
 export async function listAll(req: Request, res: Response, next: NextFunction) {
   try {
-    const applications = await getAllApplications();
+    const applications = await getAllApplications(req.user!.userId, 'assignedNodalId');
     res.json({ applications });
   } catch (e) { next(e); }
 }
@@ -26,12 +27,15 @@ export async function listAll(req: Request, res: Response, next: NextFunction) {
 // GET /api/nodal-a/appeal-review  →  combined appeal + review records with application
 export async function listAppealReview(req: Request, res: Response, next: NextFunction) {
   try {
+    const userId = req.user!.userId;
     const [appeals, reviews] = await Promise.all([
       prisma.appeal.findMany({
+        where:   { application: { assignedNodalId: userId } },
         include: { application: { include: APP_INCLUDE } },
         orderBy: { filedAt: 'desc' },
       }),
       prisma.review.findMany({
+        where:   { application: { assignedNodalId: userId } },
         include: { application: { include: APP_INCLUDE } },
         orderBy: { filedAt: 'desc' },
       }),
@@ -44,10 +48,19 @@ export async function listAppealReview(req: Request, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
-// GET /api/nodal-a/extension-requests  →  all extension requests with application
+// GET /api/nodal-a/extension-requests  →  extensions for apps assigned to this nodal where query is NOT from TO
 export async function listExtensionRequests(req: Request, res: Response, next: NextFunction) {
   try {
+    const userId = req.user!.userId;
     const raw = await prisma.extensionRequest.findMany({
+      where: {
+        application: { assignedNodalId: userId },
+        OR: [
+          { queryId: null },
+          { query: { originStage: null } },
+          { query: { originStage: { not: 'WithTechnicalOfficer' } } },
+        ],
+      },
       include: { application: { include: APP_INCLUDE } },
       orderBy: { createdAt: 'desc' },
     });
@@ -61,9 +74,14 @@ export async function grantExtensionRequest(req: Request, res: Response, next: N
   try {
     const { id } = req.params as { id: string };
     const { remarks } = req.body as { remarks?: string };
-    const ext = await prisma.extensionRequest.findUnique({ where: { id } });
+    const ext = await (prisma.extensionRequest as any).findUnique({
+      where: { id },
+      include: { application: true, query: true },
+    });
     if (!ext) throw new AppError('Extension request not found', 404);
     if (ext.status !== 'Pending') throw new AppError('Only pending requests can be actioned', 400);
+    if (ext.application.assignedNodalId !== req.user!.userId) throw new AppError('Not authorized to action this extension', 403);
+    if (ext.query?.originStage === 'WithTechnicalOfficer') throw new AppError('This extension is owned by the Technical Officer', 403);
     await prisma.extensionRequest.update({
       where: { id },
       data:  { status: 'Approved', authorityRemarks: remarks ?? null },
@@ -77,9 +95,14 @@ export async function rejectExtensionRequest(req: Request, res: Response, next: 
   try {
     const { id } = req.params as { id: string };
     const { remarks } = req.body as { remarks?: string };
-    const ext = await prisma.extensionRequest.findUnique({ where: { id } });
+    const ext = await (prisma.extensionRequest as any).findUnique({
+      where: { id },
+      include: { application: true, query: true },
+    });
     if (!ext) throw new AppError('Extension request not found', 404);
     if (ext.status !== 'Pending') throw new AppError('Only pending requests can be actioned', 400);
+    if (ext.application.assignedNodalId !== req.user!.userId) throw new AppError('Not authorized to action this extension', 403);
+    if (ext.query?.originStage === 'WithTechnicalOfficer') throw new AppError('This extension is owned by the Technical Officer', 403);
     await prisma.extensionRequest.update({
       where: { id },
       data:  { status: 'Rejected', authorityRemarks: remarks ?? null },
@@ -114,11 +137,11 @@ export async function createExtensionRequest(req: Request, res: Response, next: 
   } catch (e) { next(e); }
 }
 
-// GET /api/nodal-a/reports/appeals  →  apps that have at least one appeal filed
+// GET /api/nodal-a/reports/appeals  →  apps assigned to this nodal that have at least one appeal filed
 export async function listAppealsReport(req: Request, res: Response, next: NextFunction) {
   try {
     const applications = await prisma.application.findMany({
-      where:   { appeals: { some: {} } },
+      where:   { appeals: { some: {} }, assignedNodalId: req.user!.userId },
       include:  APP_INCLUDE,
       orderBy: { updatedAt: 'desc' },
     });
@@ -126,11 +149,11 @@ export async function listAppealsReport(req: Request, res: Response, next: NextF
   } catch (e) { next(e); }
 }
 
-// GET /api/nodal-a/reports/reviews  →  apps that have at least one review filed
+// GET /api/nodal-a/reports/reviews  →  apps assigned to this nodal that have at least one review filed
 export async function listReviewsReport(req: Request, res: Response, next: NextFunction) {
   try {
     const applications = await prisma.application.findMany({
-      where:   { reviews: { some: {} } },
+      where:   { reviews: { some: {} }, assignedNodalId: req.user!.userId },
       include:  APP_INCLUDE,
       orderBy: { updatedAt: 'desc' },
     });
@@ -138,11 +161,27 @@ export async function listReviewsReport(req: Request, res: Response, next: NextF
   } catch (e) { next(e); }
 }
 
-// POST /api/nodal-a/applications/:id/forward  →  WithTechnicalOfficer
+// GET /api/nodal-a/applications/:id/eligible-to  →  TOs eligible for this application's category
+export async function eligibleTO(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const app = await prisma.application.findUnique({ where: { id } });
+    if (!app) throw new AppError('Application not found', 404);
+    const officers = await getEligibleOfficers(ROLES.TECHNICAL_OFFICER, app.applicationType);
+    res.json({ officers });
+  } catch (e) { next(e); }
+}
+
+// POST /api/nodal-a/applications/:id/forward  →  WithTechnicalOfficer, assign TO
 export async function forwardToTechnical(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
-    const application = await advanceStage(id, 'WithNodalOfficerA', 'WithTechnicalOfficer');
+    const { toId } = req.body as { toId?: string };
+    if (!toId?.trim()) throw new AppError('toId (Technical Officer ID) is required', 400);
+    const to = await prisma.user.findUnique({ where: { id: toId }, include: { role: true } });
+    if (!to || to.role.roleCode !== ROLES.TECHNICAL_OFFICER) throw new AppError('Invalid Technical Officer', 400);
+    await advanceStage(id, 'WithNodalOfficerA', 'WithTechnicalOfficer');
+    const application = await prisma.application.update({ where: { id }, data: { assignedTOId: toId } });
     res.json({ application });
   } catch (e) { next(e); }
 }
@@ -157,6 +196,20 @@ export async function sendDecisionToApplicant(req: Request, res: Response, next:
     const targetStage = td?.decision === 'Rejected' ? 'Rejected' : 'Approved';
     const application = await advanceStage(id, 'WithNodalOfficerA', targetStage);
     res.json({ application });
+  } catch (e) { next(e); }
+}
+
+// POST /api/nodal-a/appeals/:id/forward-to-ceo  →  WithCEO (Nodal forwards pending appeal to CEO after uploading authority doc)
+export async function forwardAppealToCEO(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = req.params['id'] as string;
+    const appeal = await prisma.appeal.findUnique({ where: { id }, include: { application: true } });
+    if (!appeal) throw new AppError('Appeal not found', 404);
+    if (appeal.status !== 'AppealPending') throw new AppError('Only pending appeals can be forwarded to CEO', 400);
+    if (appeal.application.stage !== 'WithNodalOfficerA') throw new AppError(`Cannot forward: application is in "${appeal.application.stage}"`, 400);
+    if (appeal.application.assignedNodalId !== req.user!.userId) throw new AppError('Not authorized to forward this appeal', 403);
+    await prisma.application.update({ where: { id: appeal.applicationId }, data: { stage: 'WithCEO' } });
+    res.json({ success: true });
   } catch (e) { next(e); }
 }
 
@@ -237,10 +290,11 @@ export async function dispatchReviewDecision(req: Request, res: Response, next: 
 
 // ── Withdrawal requests ───────────────────────────────────────────────────────
 
-// GET /api/nodal-a/withdrawal-requests  →  all pending withdrawal requests
+// GET /api/nodal-a/withdrawal-requests  →  withdrawal requests for apps assigned to this nodal
 export async function listWithdrawalRequests(req: Request, res: Response, next: NextFunction) {
   try {
     const requests = await prisma.withdrawalRequest.findMany({
+      where:   { application: { assignedNodalId: req.user!.userId } },
       include: { application: { include: APP_INCLUDE }, requestedBy: { select: { username: true, email: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });

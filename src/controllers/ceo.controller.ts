@@ -21,11 +21,11 @@ export async function listAll(req: Request, res: Response, next: NextFunction) {
   } catch (e) { next(e); }
 }
 
-// GET /api/ceo/appeals  →  AppealPending queue
+// GET /api/ceo/appeals  →  only appeals forwarded to CEO by Nodal (application stage = WithCEO)
 export async function listAppeals(req: Request, res: Response, next: NextFunction) {
   try {
     const appeals = await prisma.appeal.findMany({
-      where: { status: 'AppealPending' },
+      where: { status: 'AppealPending', application: { stage: 'WithCEO' } },
       include: {
         application: { include: APP_INCLUDE },
         applicant: { select: { username: true, email: true } },

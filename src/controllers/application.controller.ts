@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { ROLES } from '../config/constants';
 import {
   getMyApplications,
   getApplication,
@@ -30,7 +31,7 @@ export async function myApplications(req: Request, res: Response, next: NextFunc
 export async function getOne(req: Request, res: Response, next: NextFunction) {
   try {
     // Applicants can only see their own; officers can see any
-    const applicantId = req.user!.roleCode === 'Applicant' ? req.user!.userId : undefined;
+    const applicantId = req.user!.roleCode === ROLES.APPLICANT ? req.user!.userId : undefined;
     res.json({ application: await getApplication(req.params.id as string, applicantId) });
   } catch (err) { next(err); }
 }

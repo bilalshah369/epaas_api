@@ -43,11 +43,16 @@ model User {
   licenseNumber    String?  @unique @map("license_number")
   // officeLocation is null for Applicants (TDD §4.1)
   officeLocation   String?  @map("office_location")
+  // Application types this officer handles — empty for Applicants / CEO / Chairperson / Admin
+  assignedCategories String[] @default([]) @map("assigned_categories")
   isActive         Boolean  @default(true) @map("is_active")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   applications      Application[]
+  nodalAssignments  Application[]      @relation("NodalAssignments")
+  toAssignments     Application[]      @relation("TOAssignments")
+  ecAssignments     Application[]      @relation("ECAssignments")
   queriesAsked      Query[]            @relation("QueriesAsked")
   queriesResponded  Query[]            @relation("QueriesResponded")
   documents         Document[]
@@ -66,6 +71,14 @@ model Application {
   referenceNumber String    @unique @map("reference_number")
   applicantId     String    @map("applicant_id")
   applicant       User      @relation(fields: [applicantId], references: [id])
+
+  // Officer assignment — set during workflow progression
+  assignedNodalId String?   @map("assigned_nodal_id")
+  assignedNodal   User?     @relation("NodalAssignments", fields: [assignedNodalId], references: [id])
+  assignedTOId    String?   @map("assigned_to_id")
+  assignedTO      User?     @relation("TOAssignments", fields: [assignedTOId], references: [id])
+  assignedECId    String?   @map("assigned_ec_id")
+  assignedEC      User?     @relation("ECAssignments", fields: [assignedECId], references: [id])
 
   companyName     String    @map("company_name")
   address         String    @default("")
