@@ -22,23 +22,38 @@ export async function advanceStage(
   });
 }
 
-// Fetch applications in a given stage, optionally filtered by assigned officer
+// Fetch applications in a given stage, optionally filtered by assigned officer.
+// For Nodal: also include unassigned apps (assignedNodalId IS NULL) so apps where
+// autoAssignNodal returned null are still visible to all Nodal Officers.
 export async function getApplicationsByStage(stage: string, officerId?: string, field?: 'assignedNodalId' | 'assignedTOId' | 'assignedECId') {
-  const where: Record<string, unknown> = { stage };
-  if (officerId && field) where[field] = officerId;
+  let where: any = { stage };
+  if (officerId && field) {
+    if (field === 'assignedNodalId') {
+      where = { stage, OR: [{ assignedNodalId: officerId }, { assignedNodalId: null }] };
+    } else {
+      where[field] = officerId;
+    }
+  }
   return prisma.application.findMany({
-    where:   where as any,
+    where,
     include: { applicant: { select: { username: true, email: true, licenseNumber: true } } },
     orderBy: { submittedAt: 'asc' },
   });
 }
 
-// Fetch all non-draft applications, optionally filtered by assigned officer
+// Fetch all non-draft applications, optionally filtered by assigned officer.
+// For Nodal: also include unassigned apps (assignedNodalId IS NULL).
 export async function getAllApplications(officerId?: string, field?: 'assignedNodalId' | 'assignedTOId' | 'assignedECId') {
-  const where: Record<string, unknown> = { stage: { not: 'Draft' } };
-  if (officerId && field) where[field] = officerId;
+  let where: any = { stage: { not: 'Draft' } };
+  if (officerId && field) {
+    if (field === 'assignedNodalId') {
+      where = { stage: { not: 'Draft' }, OR: [{ assignedNodalId: officerId }, { assignedNodalId: null }] };
+    } else {
+      where[field] = officerId;
+    }
+  }
   return prisma.application.findMany({
-    where:   where as any,
+    where,
     include: { applicant: { select: { username: true, email: true, licenseNumber: true } } },
     orderBy: { submittedAt: 'desc' },
   });
@@ -87,9 +102,15 @@ export async function getEligibleOfficers(roleCode: string, applicationType: str
   })).sort((a, b) => a.activeApplications - b.activeApplications);
 }
 
-// Auto-assign the Nodal Officer with fewest active apps who handles this category
+// Auto-assign the Nodal Officer with fewest active apps who handles this category.
+// Falls back to any active Nodal Officer when no one has matching assignedCategories.
 export async function autoAssignNodal(applicationType: string): Promise<string | null> {
   const eligible = await getEligibleOfficers(ROLES.NODAL_OFFICER_A, applicationType);
-  if (eligible.length === 0) return null;
-  return eligible[0].id; // already sorted by workload ascending
+  if (eligible.length > 0) return eligible[0].id;
+  // Fallback: pick any active Nodal Officer (handles case where no categories are configured)
+  const any = await prisma.user.findFirst({
+    where: { role: { roleCode: ROLES.NODAL_OFFICER_A }, isActive: true },
+    orderBy: { id: 'asc' },
+  });
+  return any?.id ?? null;
 }

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getApplicationsByStage, getAllApplications, advanceStage } from '../services/workflow.service';
+import { generateApprovalNumber } from '../services/application.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { mergeSupDoc } from '../services/extension.service';
@@ -80,9 +81,10 @@ export async function forwardToTechnicalOfficer(req: Request, res: Response, nex
     if (!app) throw new AppError('Application not found', 404);
     if (app.stage !== 'WithExpertCommittee') throw new AppError(`Cannot forward: application is in "${app.stage}"`, 400);
     if (!app.assignedTOId) throw new AppError('No Technical Officer assigned to this application', 400);
+    const approvalNumber = await generateApprovalNumber(app.applicationType, app.foodCategory, true);
     const application = await prisma.application.update({
       where: { id },
-      data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendApproval', forwardedAt: new Date().toISOString() } },
+      data: { stage: 'WithTechnicalOfficer', approvalNumber, toDecision: { fromEC: true, ecDecision: 'RecommendApproval', forwardedAt: new Date().toISOString() } },
     });
     res.json({ application });
   } catch (e) { next(e); }
@@ -100,9 +102,10 @@ export async function rejectApplication(req: Request, res: Response, next: NextF
       throw new AppError(`Cannot record rejection: application is in "${app.stage}"`, 400);
     }
     if (!app.assignedTOId) throw new AppError('No Technical Officer assigned to this application', 400);
+    const approvalNumber = await generateApprovalNumber(app.applicationType, app.foodCategory, false);
     const application = await prisma.application.update({
       where: { id },
-      data: { stage: 'WithTechnicalOfficer', toDecision: { fromEC: true, ecDecision: 'RecommendRejection', ecRemarks: reason, forwardedAt: new Date().toISOString() } },
+      data: { stage: 'WithTechnicalOfficer', approvalNumber, toDecision: { fromEC: true, ecDecision: 'RecommendRejection', ecRemarks: reason, forwardedAt: new Date().toISOString() } },
     });
     res.json({ application });
   } catch (e) { next(e); }

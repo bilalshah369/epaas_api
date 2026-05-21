@@ -12,6 +12,57 @@ const TYPE_CODES: Record<string, string> = {
   NSF: 'NSF', ClaimApproval: 'CA', AyurvedaAahara: 'AA', RPET: 'RPET', AnyOther: 'AO',
 };
 
+// ── Approval / Rejection number generation ────────────────────────────────────
+// Format: YY SS AA CC NNNNNN
+//   YY     = 2-digit year
+//   SS     = 01 (Approved) | 02 (Rejected)
+//   AA     = Approval Authority Code (application type)
+//   CC     = Product Category Code
+//   NNNNNN = 6-digit globally-unique sequential counter
+
+const APPR_TYPE_CODES: Record<string, string> = {
+  NSF: '01', ClaimApproval: '02', RPET: '03', AyurvedaAahara: '04', AnyOther: '05',
+};
+
+const FOOD_CAT_CODES: Record<string, string> = {
+  'Dairy & Products':                 '01',
+  'Cereals & Pulse Products':         '02',
+  'Bakery Products':                  '03',
+  'Beverages':                        '04',
+  'Meat & Poultry':                   '05',
+  'Fish & Marine Products':           '06',
+  'Fruits & Vegetables':              '07',
+  'Fats & Oils':                      '08',
+  'Confectionery':                    '09',
+  'Health & Nutritional Foods':       '10',
+  'Herbal & Ayurvedic Products':      '11',
+  'Novel Foods':                      '12',
+  'Fortified Foods':                  '13',
+  'Infant Foods':                     '14',
+  'Food Additives & Processing Aids': '15',
+  'Packaging Materials':              '16',
+  'FCM-rPET Packaging':               '16',
+  // Ayurveda Aahara sub-categories
+  'A':  '17',
+  'B':  '18',
+  'B1': '19',
+  'B2': '20',
+};
+
+export async function generateApprovalNumber(
+  applicationType: string,
+  foodCategory:    string,
+  isApproved:      boolean,
+): Promise<string> {
+  const yy         = String(new Date().getFullYear()).slice(-2);
+  const statusCode = isApproved ? '01' : '02';
+  const typeCode   = APPR_TYPE_CODES[applicationType] ?? '00';
+  const catCode    = FOOD_CAT_CODES[foodCategory?.trim()] ?? '00';
+  const count      = await prisma.application.count({ where: { approvalNumber: { not: null } } });
+  const seq        = String(count + 1).padStart(6, '0');
+  return `${yy} ${statusCode} ${typeCode} ${catCode} ${seq}`;
+}
+
 // ── Reference number helpers ──────────────────────────────────────────────────
 async function draftRef(): Promise<string> {
   const year = new Date().getFullYear();

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
 import { getApplicationsByStage, getAllApplications, advanceStage, getEligibleOfficers } from '../services/workflow.service';
+import { generateApprovalNumber } from '../services/application.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { mergeSupDoc } from '../services/extension.service';
@@ -181,10 +182,12 @@ export async function recordDecision(req: Request, res: Response, next: NextFunc
       throw new AppError(`Cannot record decision: application is in "${app.stage}"`, 400);
     }
     const existing = (app.toDecision as Record<string, unknown>) ?? {};
+    // Use the approval number pre-generated when EC forwarded; only generate fallback if missing
+    const approvalNumber = app.approvalNumber ?? await generateApprovalNumber(app.applicationType, app.foodCategory, decision === 'Approved');
     const toDecision = { ...existing, decision, conditions: conditions ?? '', reasons: reasons ?? '', form2Data: form2Data ?? {}, withPms: decision === 'Approved' ? (withPms ?? false) : false, recordedAt: new Date().toISOString() };
     const application = await prisma.application.update({
       where: { id },
-      data: { toDecision: toDecision as Prisma.InputJsonValue, stage: 'WithNodalOfficerA' },
+      data: { toDecision: toDecision as Prisma.InputJsonValue, stage: 'WithNodalOfficerA', approvalNumber },
     });
     res.json({ application });
   } catch (e) { next(e); }

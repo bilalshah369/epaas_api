@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getApplicationsByStage, getAllApplications, advanceStage, getEligibleOfficers } from '../services/workflow.service';
+import { generateApprovalNumber } from '../services/application.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { mergeSupDoc } from '../services/extension.service';
@@ -194,7 +195,10 @@ export async function sendDecisionToApplicant(req: Request, res: Response, next:
     if (!app) throw new AppError('Application not found', 404);
     const td = app.toDecision as Record<string, unknown> | null;
     const targetStage = td?.decision === 'Rejected' ? 'Rejected' : 'Approved';
-    const application = await advanceStage(id, 'WithNodalOfficerA', targetStage);
+    // Approval number is set when TO submits Form 2; only generate fallback if missing
+    const approvalNumber = app.approvalNumber ?? await generateApprovalNumber(app.applicationType, app.foodCategory, targetStage === 'Approved');
+    await advanceStage(id, 'WithNodalOfficerA', targetStage);
+    const application = await prisma.application.update({ where: { id }, data: { approvalNumber } });
     res.json({ application });
   } catch (e) { next(e); }
 }
@@ -226,7 +230,10 @@ export async function dispatchAppealDecision(req: Request, res: Response, next: 
       throw new AppError(`Cannot dispatch: application is in "${appeal.application.stage}"`, 400);
     }
     const targetStage = appeal.status === 'AppealApproved' ? 'Approved' : 'Rejected';
-    const application = await advanceStage(appeal.applicationId, 'WithNodalOfficerA', targetStage);
+    const baseApp = await prisma.application.findUnique({ where: { id: appeal.applicationId } });
+    const approvalNumber = await generateApprovalNumber(baseApp!.applicationType, baseApp!.foodCategory, targetStage === 'Approved');
+    await advanceStage(appeal.applicationId, 'WithNodalOfficerA', targetStage);
+    const application = await prisma.application.update({ where: { id: appeal.applicationId }, data: { approvalNumber } });
     res.json({ application });
   } catch (e) { next(e); }
 }
@@ -283,7 +290,9 @@ export async function dispatchReviewDecision(req: Request, res: Response, next: 
     if (review.application.stage !== 'WithNodalOfficerA') {
       throw new AppError(`Cannot dispatch: application is in "${review.application.stage}"`, 400);
     }
-    const application = await advanceStage(review.applicationId, 'WithNodalOfficerA', 'Rejected');
+    const approvalNumber = await generateApprovalNumber(review.application.applicationType, review.application.foodCategory, false);
+    await advanceStage(review.applicationId, 'WithNodalOfficerA', 'Rejected');
+    const application = await prisma.application.update({ where: { id: review.applicationId }, data: { approvalNumber } });
     res.json({ application });
   } catch (e) { next(e); }
 }

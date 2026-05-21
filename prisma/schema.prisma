@@ -100,6 +100,8 @@ model Application {
   // Form 2 decision data prepared by Technical Officer after EC review
   toDecision      Json?     @map("to_decision")
 
+  approvalNumber  String?   @map("approval_number")
+
   submittedAt     DateTime? @map("submitted_at")
   rejectedAt      DateTime? @map("rejected_at")
   createdAt       DateTime  @default(now()) @map("created_at")
