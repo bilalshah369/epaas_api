@@ -240,6 +240,39 @@ model ExtensionRequest {
   @@map("extension_requests")
 }
 
+// ── Circulars ──────────────────────────────────────────────────────────────────
+// Official orders / circulars shown on the public landing page.
+model Circular {
+  id          String   @id @default(uuid())
+  date        String
+  refNumber   String   @map("ref_number")
+  title       String
+  tag         String   @default("General")
+  published   Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("circulars")
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────────
+// Portal updates / notices shown on the public landing page.
+// type = 'Alert' renders as the highlighted maintenance-notice box.
+model Notification {
+  id          String   @id @default(uuid())
+  date        String
+  title       String
+  type        String   @default("Update")
+  body        String?
+  published   Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("notifications")
+}
+
 // ── Withdrawal Requests ────────────────────────────────────────────────────────
 // Applicant requests withdrawal of any non-rejected submitted application.
 // Nodal Officer A can also directly withdraw an approved application.

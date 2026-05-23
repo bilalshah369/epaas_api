@@ -6,6 +6,10 @@ import {
   toggleOfficerStatus, getAuditTrail, listExtensions, listAppeals,
   createOfficer, createRole, updateOfficerProfile, deleteOfficer,
 } from '../controllers/admin.controller';
+import {
+  listCirculars, createCircular, updateCircular, deleteCircular,
+  listNotifications, createNotification, updateNotification, deleteNotification,
+} from '../controllers/content.controller';
 
 const router = Router();
 const adminGuard = [verifyToken, checkRole('Admin')];
@@ -23,5 +27,16 @@ router.delete('/officers/:id',                 ...adminGuard, deleteOfficer);
 router.get   ('/applications/:id/audit',       ...adminGuard, getAuditTrail);
 router.get   ('/extensions',                   ...adminGuard, listExtensions);
 router.get   ('/appeals',                      ...adminGuard, listAppeals);
+
+// ── Content management ────────────────────────────────────────────────────
+router.get   ('/circulars',           ...adminGuard, listCirculars);
+router.post  ('/circulars',           ...adminGuard, createCircular);
+router.patch ('/circulars/:id',       ...adminGuard, updateCircular);
+router.delete('/circulars/:id',       ...adminGuard, deleteCircular);
+
+router.get   ('/notifications',       ...adminGuard, listNotifications);
+router.post  ('/notifications',       ...adminGuard, createNotification);
+router.patch ('/notifications/:id',   ...adminGuard, updateNotification);
+router.delete('/notifications/:id',   ...adminGuard, deleteNotification);
 
 export default router;

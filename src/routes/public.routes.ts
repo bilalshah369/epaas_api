@@ -107,4 +107,26 @@ router.get('/track', async (req: Request, res: Response, next: NextFunction) => 
   } catch (err) { next(err); }
 });
 
+router.get('/circulars', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const circulars = await prisma.circular.findMany({
+      where: { published: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 5,
+    });
+    res.json({ circulars });
+  } catch (err) { next(err); }
+});
+
+router.get('/notifications', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const notifications = await prisma.notification.findMany({
+      where: { published: true },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
+      take: 6,
+    });
+    res.json({ notifications });
+  } catch (err) { next(err); }
+});
+
 export default router;
