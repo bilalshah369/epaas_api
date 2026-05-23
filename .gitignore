@@ -2,3 +2,6 @@
 node_modules
 DOCS
 uploads
+node_modules
+dist
+build
