@@ -10,7 +10,7 @@ const SUBMITTED_STAGES = [
 ];
 
 const TYPE_CODES: Record<string, string> = {
-  NSF: 'NSF', ClaimApproval: 'CA', AyurvedaAahara: 'AA', RPET: 'RPET', AnyOther: 'AO',
+  NSF: 'NSF', ClaimApproval: 'CA', AyurvedaAahara: 'AA', RPET: 'RPET', AnyOther: 'AO', Vegan: 'VG',
 };
 
 // ── Approval / Rejection number generation ────────────────────────────────────
@@ -22,7 +22,7 @@ const TYPE_CODES: Record<string, string> = {
 //   NNNNNN = 6-digit globally-unique sequential counter
 
 const APPR_TYPE_CODES: Record<string, string> = {
-  NSF: '01', ClaimApproval: '02', RPET: '03', AyurvedaAahara: '04', AnyOther: '05',
+  NSF: '01', ClaimApproval: '02', RPET: '03', AyurvedaAahara: '04', AnyOther: '05', Vegan: '06',
 };
 
 const FOOD_CAT_CODES: Record<string, string> = {
@@ -92,6 +92,7 @@ const TYPE_NORM: Record<string, string[]> = {
   AyurvedaAahara: ['AA', 'AyurvedaAahara'],
   RPET:           ['RPET'],
   AnyOther:       ['AnyOther'],
+  Vegan:          ['Vegan'],
 };
 
 export interface ApplicationFilters {
@@ -169,6 +170,13 @@ function extractMeta(applicationType: string, fd: Record<string, unknown>): {
     };
   }
 
+  if (applicationType === 'Vegan') {
+    return {
+      address:      s(fd.fboAddress) || s(fd.mfgAddress),
+      foodCategory: s(fd.foodCategory),
+    };
+  }
+
   // NSF / AnyOther — nested step2
   const step2 = (fd.step2 && typeof fd.step2 === 'object') ? fd.step2 as Record<string, unknown> : {};
   return {
@@ -197,8 +205,10 @@ export async function deleteDraft(id: string, applicantId: string) {
   const app = await prisma.application.findFirst({ where: { id, applicantId, stage: 'Draft' } });
   if (!app) throw new AppError('Draft not found', 404);
   // Delete child records first to satisfy FK constraints (no cascade in schema)
+  await prisma.payment.deleteMany({ where: { applicationId: id } });
   await prisma.document.deleteMany({ where: { applicationId: id } });
   await prisma.query.deleteMany({ where: { applicationId: id } });
+  await prisma.extensionRequest.deleteMany({ where: { applicationId: id } });
   await prisma.application.delete({ where: { id } });
 }
 

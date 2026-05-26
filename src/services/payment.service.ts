@@ -6,14 +6,14 @@ import { AppError } from '../middleware/errorHandler.middleware';
 // ── Fee table (paise) ─────────────────────────────────────────────────────────
 const FEE_PAISE: Record<string, number> = {
   NSF:            5900000,  // ₹59,000
-  ClaimApproval:  5900000,
-  AyurvedaAahara: 5900000,
-  RPET:           1770000,  // ₹17,700
-  AnyOther:       1180000,  // ₹11,800
+  ClaimApproval:  5900000,  // ₹59,000
+  AyurvedaAahara: 5900000,  // ₹59,000
+  RPET:           236000,   // ₹2,360
+  Vegan:          1180000,  // ₹11,800
 };
 
 // Application types that are exempt from payment (no fee)
-const NO_FEE_TYPES: string[] = [];
+const NO_FEE_TYPES: string[] = ['AnyOther'];
 
 function getRazorpay() {
   return new Razorpay({
@@ -48,6 +48,20 @@ async function generateInvoiceNo(): Promise<string> {
   return `${fyCode}ES${seq}`;
 }
 
+// ── Dynamic Ayurveda Aahara fee ───────────────────────────────────────────────
+function getAAFeePaise(formData: unknown): number {
+  if (!formData || typeof formData !== 'object') return 5900000; // default ₹59,000
+  const fd  = formData as Record<string, unknown>;
+  const cat = String(fd.ayurvedaCategory ?? '');
+  const isA = cat.startsWith('Category A');
+  const diseaseRisk = isA
+    ? String(fd.catADiseaseRiskYesNo ?? '') === 'Yes'
+    : String(fd.catBDiseaseRiskYesNo ?? '') === 'Yes';
+
+  if (isA) return diseaseRisk ? 5900000 : 885000;   // ₹59,000 or ₹8,850
+  return diseaseRisk ? 5900000 : 1180000;            // ₹59,000 or ₹11,800
+}
+
 // ── createOrder ───────────────────────────────────────────────────────────────
 export async function createOrder(applicationId: string, userId: string) {
   const application = await prisma.application.findUnique({
@@ -56,8 +70,10 @@ export async function createOrder(applicationId: string, userId: string) {
   if (!application) throw new AppError('Application not found', 404);
   if (application.applicantId !== userId) throw new AppError('Forbidden', 403);
 
-  const amountPaise = FEE_PAISE[application.applicationType] ?? FEE_PAISE['NSF'];
-  const isNoFee     = NO_FEE_TYPES.includes(application.applicationType);
+  const isNoFee = NO_FEE_TYPES.includes(application.applicationType);
+  const amountPaise = application.applicationType === 'AyurvedaAahara'
+    ? getAAFeePaise(application.formData)
+    : (FEE_PAISE[application.applicationType] ?? FEE_PAISE['NSF']);
 
   // Existing completed payment — idempotent
   const existing = await prisma.payment.findUnique({ where: { applicationId } });
