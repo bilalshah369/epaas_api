@@ -17,6 +17,7 @@ import appealRouter from "./routes/appeal.routes";
 import extensionRouter from "./routes/extension.routes";
 import publicRouter from "./routes/public.routes";
 import adminRouter from "./routes/admin.routes";
+import paymentRouter from "./routes/payment.routes";
 import { errorHandler } from "./middleware/errorHandler.middleware";
 
 const app = express();
@@ -75,6 +76,7 @@ app.use("/api/chairperson", chairpersonRouter);
 app.use("/api/appeals", appealRouter);
 app.use("/api/extensions", extensionRouter);
 app.use("/api/admin", adminRouter);
+app.use("/api/payments", paymentRouter);
 
 // ── 404 ────────────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

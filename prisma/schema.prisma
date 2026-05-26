@@ -60,6 +60,7 @@ model User {
   reviews              Review[]           @relation("ReviewsByUser")
   extensionRequests    ExtensionRequest[] @relation("ExtensionsByUser")
   withdrawalRequests   WithdrawalRequest[] @relation("WithdrawalsByUser")
+  payments             Payment[]          @relation("PaymentsByUser")
 
   @@map("users")
 }
@@ -113,6 +114,7 @@ model Application {
   reviews            Review[]
   extensionRequests  ExtensionRequest[]
   withdrawalRequests WithdrawalRequest[]
+  payment            Payment?
 
   @@map("applications")
 }
@@ -271,6 +273,31 @@ model Notification {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("notifications")
+}
+
+// ── Payments ───────────────────────────────────────────────────────────────────
+// One row per application — tracks Razorpay order lifecycle.
+// status: Pending | Completed | Failed
+model Payment {
+  id                  String      @id @default(uuid())
+  applicationId       String      @unique @map("application_id")
+  application         Application @relation(fields: [applicationId], references: [id])
+  userId              String      @map("user_id")
+  user                User        @relation("PaymentsByUser", fields: [userId], references: [id])
+
+  razorpayOrderId     String?     @map("razorpay_order_id")
+  razorpayPaymentId   String?     @map("razorpay_payment_id")
+  razorpaySignature   String?     @map("razorpay_signature")
+
+  amount              Int                        // in paise (₹59,000 → 5900000)
+  currency            String      @default("INR")
+  status              String      @default("Pending") // Pending | Completed | Failed
+  invoiceNo           String?     @map("invoice_no")
+
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  @@map("payments")
 }
 
 // ── Withdrawal Requests ────────────────────────────────────────────────────────

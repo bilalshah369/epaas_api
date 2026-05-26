@@ -1,6 +1,7 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { autoAssignNodal } from './workflow.service';
+import { isPaymentComplete } from './payment.service';
 
 const SUBMITTED_STAGES = [
   'Submitted', 'WithNodalOfficerA', 'WithTechnicalOfficer',
@@ -210,21 +211,9 @@ export async function submitApplication(id: string, applicantId: string) {
     throw new AppError('Application form is incomplete. Please fill in all required fields before submitting.', 422);
   }
 
-  const fd = app.formData as Record<string, unknown>;
-
-  // Extract and validate payment reference — location differs by form type
-  let paymentRef = '';
-  if (typeof fd.paymentReference === 'string') {
-    // CA and AA use flat structure
-    paymentRef = fd.paymentReference;
-  } else if (fd.step5 && typeof fd.step5 === 'object') {
-    // NSF / rPET / AnyOther use step5.paymentReference
-    const step5 = fd.step5 as Record<string, unknown>;
-    if (typeof step5.paymentReference === 'string') paymentRef = step5.paymentReference;
-  }
-
-  if (!paymentRef.trim()) {
-    throw new AppError('Payment reference is required. Please complete the payment step before submitting.', 422);
+  const paid = await isPaymentComplete(id, app.applicationType);
+  if (!paid) {
+    throw new AppError('Payment not completed. Please complete the payment before submitting.', 422);
   }
 
   const newRef        = await submittedRef(app.applicationType);
