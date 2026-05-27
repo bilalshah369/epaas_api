@@ -4,6 +4,8 @@ import { generateApprovalNumber } from '../services/application.service';
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
 import { mergeSupDoc } from '../services/extension.service';
+import { createQuery } from '../services/query.service';
+import { ROLES } from '../config/constants';
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 
@@ -127,7 +129,47 @@ export async function saveAssessment(req: Request, res: Response, next: NextFunc
   } catch (e) { next(e); }
 }
 
-// POST /api/ec/applications/:id/clarify  →  QuerySent (EC requests clarification from applicant via NA)
+// POST /api/ec/extension-requests/:id/grant
+export async function grantExtensionRequest(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as { id: string };
+    const { remarks } = req.body as { remarks?: string };
+    const ext = await (prisma.extensionRequest as any).findUnique({
+      where: { id },
+      include: { application: true, query: true },
+    });
+    if (!ext) throw new AppError('Extension request not found', 404);
+    if (ext.status !== 'Pending') throw new AppError('Only pending requests can be actioned', 400);
+    if (ext.application.assignedECId !== req.user!.userId) throw new AppError('Not authorized to action this extension', 403);
+    await prisma.extensionRequest.update({
+      where: { id },
+      data:  { status: 'Approved', authorityRemarks: remarks ?? null },
+    });
+    res.json({ message: 'Extension request granted.' });
+  } catch (e) { next(e); }
+}
+
+// POST /api/ec/extension-requests/:id/reject
+export async function rejectExtensionRequest(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as { id: string };
+    const { remarks } = req.body as { remarks?: string };
+    const ext = await (prisma.extensionRequest as any).findUnique({
+      where: { id },
+      include: { application: true, query: true },
+    });
+    if (!ext) throw new AppError('Extension request not found', 404);
+    if (ext.status !== 'Pending') throw new AppError('Only pending requests can be actioned', 400);
+    if (ext.application.assignedECId !== req.user!.userId) throw new AppError('Not authorized to action this extension', 403);
+    await prisma.extensionRequest.update({
+      where: { id },
+      data:  { status: 'Rejected', authorityRemarks: remarks ?? null },
+    });
+    res.json({ message: 'Extension request rejected.' });
+  } catch (e) { next(e); }
+}
+
+// POST /api/ec/applications/:id/clarify  →  WithNodalOfficerA (EC query routed via Nodal A, same pattern as TO queries)
 export async function requestClarification(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params['id'] as string;
@@ -138,13 +180,18 @@ export async function requestClarification(req: Request, res: Response, next: Ne
     if (app.stage !== 'WithExpertCommittee') {
       throw new AppError(`Cannot request clarification: application is in "${app.stage}"`, 400);
     }
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
     await prisma.$transaction([
       prisma.query.create({
-        data: { applicationId: id, text, askedById: userId ?? '', originStage: 'WithExpertCommittee', revertedFromStage: 'WithExpertCommittee' },
+        data: {
+          applicationId: id,
+          text,
+          askedById: req.user!.userId,
+          originStage: 'WithExpertCommittee',
+          revertedFromStage: 'WithNodalOfficerA',
+        },
       }),
-      prisma.application.update({ where: { id }, data: { stage: 'QuerySent' } }),
+      prisma.application.update({ where: { id }, data: { stage: 'WithNodalOfficerA' } }),
     ]);
-    res.json({ message: 'Clarification requested. Application stage set to QuerySent.' });
+    res.json({ message: 'Clarification requested — application forwarded to Nodal Officer A.' });
   } catch (e) { next(e); }
 }

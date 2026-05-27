@@ -138,11 +138,15 @@ export async function requestWithdrawal(req: Request, res: Response, next: NextF
     if (app.applicantId !== req.user!.userId) throw new AppError('Forbidden', 403);
     const INELIGIBLE = ['Draft', 'Rejected', 'Withdrawn', 'WithdrawnByAuthority'];
     if (INELIGIBLE.includes(app.stage)) throw new AppError(`Cannot withdraw application in stage: ${app.stage}`, 400);
-    const existing = await prisma.withdrawalRequest.findFirst({ where: { applicationId: app.id, status: 'Pending' } });
-    if (existing) throw new AppError('A withdrawal request is already pending for this application', 409);
-    const request = await prisma.withdrawalRequest.create({
-      data: { applicationId: app.id, requestedById: req.user!.userId, type: 'ByApplicant', justification: justification.trim(), status: 'Pending' },
-    });
-    res.status(201).json({ request });
+    await prisma.$transaction([
+      prisma.withdrawalRequest.create({
+        data: { applicationId: app.id, requestedById: req.user!.userId, type: 'ByApplicant', justification: justification.trim(), status: 'Approved' },
+      }),
+      prisma.application.update({
+        where: { id: app.id },
+        data:  { stage: 'Withdrawn', workflowType: 'WithdrawalByApplicant' },
+      }),
+    ]);
+    res.status(201).json({ message: 'Application withdrawn successfully.' });
   } catch (err) { next(err); }
 }

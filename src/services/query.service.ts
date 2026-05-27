@@ -26,6 +26,7 @@ export async function createQuery(applicationId: string, askedById: string, text
   }
 
   const isTechQuery = callerRoleCode === ROLES.TECHNICAL_OFFICER;
+  const isECQuery   = callerRoleCode === ROLES.EXPERT_COMMITTEE;
 
   const [query] = await prisma.$transaction([
     prisma.query.create({
@@ -33,30 +34,33 @@ export async function createQuery(applicationId: string, askedById: string, text
         applicationId,
         text,
         askedById,
-        // Tech queries revert to Nodal when applicant responds (not back to Tech directly)
-        revertedFromStage: isTechQuery ? STAGES.WITH_NODAL_OFFICER_A : app.stage,
-        originStage:       isTechQuery ? STAGES.WITH_TECHNICAL_OFFICER : null,
+        // Tech + EC queries revert to Nodal when applicant responds
+        revertedFromStage: (isTechQuery || isECQuery) ? STAGES.WITH_NODAL_OFFICER_A : app.stage,
+        originStage:       isTechQuery ? STAGES.WITH_TECHNICAL_OFFICER
+                         : isECQuery   ? STAGES.WITH_EXPERT_COMMITTEE
+                         : null,
       },
       include: QUERY_INCLUDE,
     }),
     prisma.application.update({
       where: { id: applicationId },
-      // Tech queries go to Nodal inbox; Nodal queries go directly to applicant
-      data: { stage: isTechQuery ? STAGES.WITH_NODAL_OFFICER_A : 'QuerySent' },
+      // Tech + EC queries go to Nodal inbox; Nodal queries go directly to applicant
+      data: { stage: (isTechQuery || isECQuery) ? STAGES.WITH_NODAL_OFFICER_A : 'QuerySent' },
     }),
   ]);
 
   return query;
 }
 
-// Nodal Officer forwards a Tech Officer query to the applicant
+// Nodal Officer forwards a Tech Officer or EC query to the applicant
 export async function nodalForwardQueryToApplicant(queryId: string) {
   const query = await prisma.query.findUnique({
     where: { id: queryId },
     include: { application: true },
   });
   if (!query) throw new AppError('Query not found', 404);
-  if (query.originStage !== STAGES.WITH_TECHNICAL_OFFICER) throw new AppError('Not a Technical Officer query', 400);
+  const validOrigins = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
+  if (!validOrigins.includes(query.originStage as typeof STAGES[keyof typeof STAGES])) throw new AppError('Not a forwarded query', 400);
   if (query.nodalForwardedAt) throw new AppError('Query already forwarded to applicant', 400);
 
   const [updated] = await prisma.$transaction([
@@ -74,16 +78,17 @@ export async function nodalForwardQueryToApplicant(queryId: string) {
   return updated;
 }
 
-// Nodal Officer forwards applicant's response back to the Technical Officer
+// Nodal Officer forwards applicant's response back to the originating officer (TO or EC)
 export async function nodalForwardResponseToTech(queryId: string) {
   const query = await prisma.query.findUnique({
     where: { id: queryId },
     include: { application: true },
   });
   if (!query) throw new AppError('Query not found', 404);
-  if (query.originStage !== STAGES.WITH_TECHNICAL_OFFICER) throw new AppError('Not a Technical Officer query', 400);
+  const validOrigins = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
+  if (!validOrigins.includes(query.originStage as typeof STAGES[keyof typeof STAGES])) throw new AppError('Not a forwarded query', 400);
   if (!query.response) throw new AppError('Applicant has not responded yet', 400);
-  if (query.nodalFwdResponseAt) throw new AppError('Response already forwarded to Technical Officer', 400);
+  if (query.nodalFwdResponseAt) throw new AppError('Response already forwarded', 400);
 
   const [updated] = await prisma.$transaction([
     prisma.query.update({
@@ -93,7 +98,7 @@ export async function nodalForwardResponseToTech(queryId: string) {
     }),
     prisma.application.update({
       where: { id: query.applicationId },
-      data:  { stage: STAGES.WITH_TECHNICAL_OFFICER },
+      data:  { stage: query.originStage as string },
     }),
   ]);
 
