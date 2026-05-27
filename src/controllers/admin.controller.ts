@@ -6,7 +6,7 @@ import { AppError } from '../middleware/errorHandler.middleware';
 import { ROLES } from '../config/constants';
 
 const OFFICER_CREATION_ROLES = [ROLES.NODAL_OFFICER_A, ROLES.TECHNICAL_OFFICER, ROLES.EXPERT_COMMITTEE];
-const VALID_CATEGORIES = ['NSF', 'ClaimApproval', 'AyurvedaAahara', 'RPET', 'AnyOther'];
+const VALID_CATEGORIES = ['NSF', 'ClaimApproval', 'AyurvedaAahara', 'RPET', 'Vegan', 'AnyOther'];
 
 const APP_INCLUDE = { applicant: { select: { username: true, email: true, licenseNumber: true } } };
 

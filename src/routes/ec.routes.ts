@@ -5,6 +5,7 @@ import {
   listPending, listAll, listAppealReview, listExtensionRequests,
   listAppealsReport, listReviewsReport,
   forwardToTechnicalOfficer, rejectApplication, requestClarification, saveAssessment,
+  grantExtensionRequest, rejectExtensionRequest,
 } from '../controllers/ec.controller';
 
 const router = Router();
@@ -14,6 +15,8 @@ router.get ('/all',                              ...ecMember, listAll);
 router.get ('/applications',                    ...ecMember, listPending);
 router.get ('/appeal-review',                   ...ecMember, listAppealReview);
 router.get ('/extension-requests',              ...ecMember, listExtensionRequests);
+router.post('/extension-requests/:id/grant',    ...ecMember, grantExtensionRequest);
+router.post('/extension-requests/:id/reject',   ...ecMember, rejectExtensionRequest);
 router.get ('/reports/appeals',                 ...ecMember, listAppealsReport);
 router.get ('/reports/reviews',                 ...ecMember, listReviewsReport);
 router.post ('/applications/:id/forward-technical', ...ecMember, forwardToTechnicalOfficer);

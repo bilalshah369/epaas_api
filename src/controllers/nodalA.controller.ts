@@ -20,7 +20,53 @@ export async function listPending(req: Request, res: Response, next: NextFunctio
 // GET /api/nodal-a/all  →  all non-draft applications assigned to this officer
 export async function listAll(req: Request, res: Response, next: NextFunction) {
   try {
-    const applications = await getAllApplications(req.user!.userId, 'assignedNodalId');
+    const applications = await prisma.application.findMany({
+      where: { stage: { not: 'Draft' }, OR: [{ assignedNodalId: req.user!.userId }, { assignedNodalId: null }] },
+      include: {
+        applicant: { select: { username: true, email: true, licenseNumber: true } },
+        queries: {
+          where: {
+            OR: [
+              {
+                originStage: 'WithTechnicalOfficer',
+                OR: [
+                  { nodalForwardedAt: null },
+                  { nodalForwardedAt: { not: null }, response: { not: null }, nodalFwdResponseAt: null },
+                ],
+              },
+              {
+                originStage: 'WithExpertCommittee',
+                OR: [
+                  { nodalForwardedAt: null },
+                  { nodalForwardedAt: { not: null }, response: { not: null }, nodalFwdResponseAt: null },
+                ],
+              },
+            ],
+          },
+          select: { id: true },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+    res.json({ applications });
+  } catch (e) { next(e); }
+}
+
+// GET /api/nodal-a/pms-applications  →  approved apps with PMS condition that have submitted a PMS report
+export async function listPmsApplications(req: Request, res: Response, next: NextFunction) {
+  try {
+    const applications = await prisma.application.findMany({
+      where: {
+        stage: 'Approved',
+        OR: [{ assignedNodalId: req.user!.userId }, { assignedNodalId: null }],
+        documents: { some: { fieldName: 'pmsReport' } },
+      },
+      include: {
+        applicant: { select: { username: true, email: true, licenseNumber: true } },
+        documents: { where: { fieldName: 'pmsReport' }, orderBy: { uploadedAt: 'desc' } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
     res.json({ applications });
   } catch (e) { next(e); }
 }
@@ -299,11 +345,11 @@ export async function dispatchReviewDecision(req: Request, res: Response, next: 
 
 // ── Withdrawal requests ───────────────────────────────────────────────────────
 
-// GET /api/nodal-a/withdrawal-requests  →  withdrawal requests for apps assigned to this nodal
+// GET /api/nodal-a/withdrawal-requests  →  withdrawal requests for apps assigned to (or unassigned to) this nodal
 export async function listWithdrawalRequests(req: Request, res: Response, next: NextFunction) {
   try {
     const requests = await prisma.withdrawalRequest.findMany({
-      where:   { application: { assignedNodalId: req.user!.userId } },
+      where:   { application: { OR: [{ assignedNodalId: req.user!.userId }, { assignedNodalId: null }] } },
       include: { application: { include: APP_INCLUDE }, requestedBy: { select: { username: true, email: true, name: true } } },
       orderBy: { createdAt: 'desc' },
     });
