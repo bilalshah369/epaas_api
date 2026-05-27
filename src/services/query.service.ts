@@ -1,6 +1,6 @@
 import { prisma } from '../config/db';
 import { AppError } from '../middleware/errorHandler.middleware';
-import { ROLES, STAGES } from '../config/constants';
+import { ROLES, STAGES, Stage } from '../config/constants';
 
 const QUERY_INCLUDE = {
   askedBy:     { select: { id: true, username: true, officeLocation: true } },
@@ -59,8 +59,8 @@ export async function nodalForwardQueryToApplicant(queryId: string) {
     include: { application: true },
   });
   if (!query) throw new AppError('Query not found', 404);
-  const validOrigins = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
-  if (!validOrigins.includes(query.originStage as typeof STAGES[keyof typeof STAGES])) throw new AppError('Not a forwarded query', 400);
+  const validOrigins: Stage[] = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
+  if (!validOrigins.includes(query.originStage as Stage)) throw new AppError('Not a forwarded query', 400);
   if (query.nodalForwardedAt) throw new AppError('Query already forwarded to applicant', 400);
 
   const [updated] = await prisma.$transaction([
@@ -85,8 +85,8 @@ export async function nodalForwardResponseToTech(queryId: string) {
     include: { application: true },
   });
   if (!query) throw new AppError('Query not found', 404);
-  const validOrigins = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
-  if (!validOrigins.includes(query.originStage as typeof STAGES[keyof typeof STAGES])) throw new AppError('Not a forwarded query', 400);
+  const validOrigins: Stage[] = [STAGES.WITH_TECHNICAL_OFFICER, STAGES.WITH_EXPERT_COMMITTEE];
+  if (!validOrigins.includes(query.originStage as Stage)) throw new AppError('Not a forwarded query', 400);
   if (!query.response) throw new AppError('Applicant has not responded yet', 400);
   if (query.nodalFwdResponseAt) throw new AppError('Response already forwarded', 400);
 
