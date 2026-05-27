@@ -25,6 +25,25 @@ export async function listAll(req: Request, res: Response, next: NextFunction) {
   } catch (e) { next(e); }
 }
 
+// GET /api/nodal-a/pms-applications  →  approved apps with PMS condition that have submitted a PMS report
+export async function listPmsApplications(req: Request, res: Response, next: NextFunction) {
+  try {
+    const applications = await prisma.application.findMany({
+      where: {
+        stage: 'Approved',
+        OR: [{ assignedNodalId: req.user!.userId }, { assignedNodalId: null }],
+        documents: { some: { fieldName: 'pmsReport' } },
+      },
+      include: {
+        applicant: { select: { username: true, email: true, licenseNumber: true } },
+        documents: { where: { fieldName: 'pmsReport' }, orderBy: { uploadedAt: 'desc' } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    res.json({ applications });
+  } catch (e) { next(e); }
+}
+
 // GET /api/nodal-a/appeal-review  →  combined appeal + review records with application
 export async function listAppealReview(req: Request, res: Response, next: NextFunction) {
   try {

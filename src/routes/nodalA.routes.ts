@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { verifyToken } from '../middleware/auth.middleware';
 import { checkRole }   from '../middleware/role.middleware';
 import {
-  listPending, listAll, forwardToTechnical, eligibleTO, listAppealsReport, listReviewsReport, listAppealReview, listExtensionRequests,
+  listPending, listAll, listPmsApplications, forwardToTechnical, eligibleTO, listAppealsReport, listReviewsReport, listAppealReview, listExtensionRequests,
   grantExtensionRequest, rejectExtensionRequest, createExtensionRequest,
   sendDecisionToApplicant, forwardAppealToCEO, dispatchAppealDecision, dispatchReviewDecision, forwardReviewToChairperson,
   uploadAppealAuthorityDoc, uploadReviewAuthorityDoc,
@@ -13,6 +13,7 @@ const router  = Router();
 const nodalA  = [verifyToken, checkRole('NodalOfficerA')];
 
 router.get('/all',                       ...nodalA, listAll);
+router.get('/pms-applications',          ...nodalA, listPmsApplications);
 router.get('/applications',              ...nodalA, listPending);
 router.get('/reports/appeals',           ...nodalA, listAppealsReport);
 router.get('/reports/reviews',           ...nodalA, listReviewsReport);
